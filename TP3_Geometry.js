@@ -20,21 +20,10 @@ function getNodeAngle(nodeA, nodeB) {
 	var vectorA = new THREE.Vector3().subVectors(nodeA.p1, nodeA.p0);
 	var vectorB = new THREE.Vector3().subVectors(nodeB.p1, nodeB.p0);
 
-	// dot product
-	var dotProduct = vectorA.dot(vectorB);
+	// get Angle
+	var [, angle] = TP3.Geometry.findRotation(vectorA, vectorB);
 
-	var lenA = vectorA.length();
-	var lenB = vectorB.length();
-
-	// Cosinus
-	var cosAngle = dotProduct / (lenA * lenB);
-
-	cosAngle = Math.max(-1, Math.min(1, cosAngle));
-
-	var radAngle = Math.acos(cosAngle);
-	var degAngle = THREE.MathUtils.radToDeg(radAngle);
-
-	return degAngle;
+	return angle;
 }
 
 
@@ -72,16 +61,17 @@ TP3.Geometry = {
 		}
 
 		simplifyNode(rootNode);
-
 		return rootNode;
 	},
 
 	generateSegmentsHermite: function (rootNode, lengthDivisions = 4, radialDivisions = 8) {
 		//TODO
+
 	},
 
 	hermite: function (h0, h1, v0, v1, t) {
 		//TODO
+
 	},
 
 
@@ -117,6 +107,7 @@ TP3.Geometry = {
 		return mp.divideScalar(points.length);
 	},
 
+	// Fonction to see Nodes
 	printTreeNodes: function (rootNode) {
 		var stack = [];
 		stack.push(rootNode);
@@ -124,16 +115,14 @@ TP3.Geometry = {
 		while (stack.length > 0) {
 			var currentNode = stack.pop();
 
-			// Imprimir información del nodo actual
 			console.log("Nodo ID:", currentNode.id || "Sin ID");
 			console.log("  p0:", currentNode.p0);
 			console.log("  p1:", currentNode.p1);
 			console.log("  a0:", currentNode.a0);
 			console.log("  a1:", currentNode.a1);
-			console.log("  Padre:", currentNode.parentNode ? currentNode.parentNode.id : "Sin padre");
-			console.log("  Hijos:", currentNode.childNode.map(child => child.id || "Sin ID").join(", "));
+			console.log("  Current:", currentNode.parentNode ? currentNode.parentNode.id : "No Node");
+			console.log("  Child:", currentNode.childNode.map(child => child.id || "No ID").join(", "));
 
-			// Añadir hijos al stack para seguir recorriendo
 			for (var i = 0; i < currentNode.childNode.length; i++) {
 				stack.push(currentNode.childNode[i]);
 			}
