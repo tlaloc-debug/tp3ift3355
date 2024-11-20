@@ -56,7 +56,7 @@ TP3.Geometry = {
 					var grandChild = child.childNode[0];
 
 					var angle = getNodeAngle(child, grandChild);
-					console.log(angle)
+					//console.log(angle)
 
 					if (angle < rotationThreshold) {
 
@@ -70,8 +70,10 @@ TP3.Geometry = {
 				}
 			}
 		}
-		
+
 		simplifyNode(rootNode);
+
+		return rootNode;
 	},
 
 	generateSegmentsHermite: function (rootNode, lengthDivisions = 4, radialDivisions = 8) {
