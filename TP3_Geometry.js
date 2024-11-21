@@ -66,12 +66,124 @@ TP3.Geometry = {
 
 	generateSegmentsHermite: function (rootNode, lengthDivisions = 4, radialDivisions = 8) {
 		//TODO
+		function generateNodeSections(node) {
+			node.sections = [];
+
+			const points = [];
+			const tangents = [];
+
+			// Calculate v0 as the vector from p0 to p1 of the current node
+			const v0 = new THREE.Vector3().subVectors(node.p1, node.p0);
+
+			if (node.childNode.length > 0) {
+				// Iterate through the child nodes to calculate v1 and create the Hermite curve
+				for (const child of node.childNode) {
+					// Calculate v1 as the vector from p0 to p1 of the child node
+					const v1 = new THREE.Vector3().subVectors(child.p1, child.p0);
+
+					// Generate points along the Hermite curve between node.p0 and child.p0
+					for (let i = 0; i <= lengthDivisions; i++) {
+						const t = i / lengthDivisions;
+
+						// Calculate the interpolated point and tangent at parameter t
+						const [point, tangent] = TP3.Geometry.hermite(node.p0, child.p0, v0, v1, t);
+						points.push(point);
+						tangents.push(tangent);
+					}
+				}
+			} else {
+				// In case the branch has no children (last branches of the tree) the same vector (p1 - p0)
+				// is used for both tangents (the branch does not suffer courvature)
+				for (let i = 0; i <= lengthDivisions; i++) {
+					const t = i / lengthDivisions;
+
+					// Calculate the interpolated point and tangent at parameter t
+					const [point, tangent] = TP3.Geometry.hermite(node.p0, node.p1, v0, v0, t);
+					points.push(point);
+					tangents.push(tangent);
+				}
+			}
+
+			// Generate circular sections at each interpolated point along the Hermite curve
+			for (let i = 0; i < points.length; i++) {
+				const center = points[i];
+				const tangent = tangents[i];
+
+				// Generate the orthogonal plane using the tangent vector
+				let normal = new THREE.Vector3(1, 0, 0);
+				if (Math.abs(tangent.dot(normal)) > 0.9) {
+					normal.set(0, 1, 0);
+				}
+				const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+				normal = new THREE.Vector3().crossVectors(binormal, tangent).normalize();
+
+				// Use the radii a0 and a1 to scale the circular sections
+				const radius = node.a0 + (i / (points.length - 1)) * (node.a1 - node.a0);
+
+				// Create a circle of points on the orthogonal plane
+				const section = [];
+				for (let j = 0; j < radialDivisions; j++) {
+					const angle = (2 * Math.PI * j) / radialDivisions;
+					const point = center.clone()
+						.addScaledVector(normal, Math.cos(angle) * radius)
+						.addScaledVector(binormal, Math.sin(angle) * radius);
+					section.push(point);
+				}
+
+				// POSSIBLE OPTIMIZATION
+				// Since we are considering the tangent of the child node to the Hermite curvature,
+				// nodes with two children will create two curvatures. This code selects only the first curvature.
+				// We might have a better result if we choose the "curvier" curvature instead of the first one.
+				if (node.sections.length <= lengthDivisions) {
+					node.sections.push(section);
+				}
+
+			}
+
+			// Recursion for child nodes
+			for (const child of node.childNode) {
+				generateNodeSections(child);
+			}
+
+			return node;
+		}
+
+		generateNodeSections(rootNode);
+		return rootNode;
 
 	},
 
 	hermite: function (h0, h1, v0, v1, t) {
 		//TODO
+		// Hermite basis polynomials
+		const h00 = 2 * t ** 3 - 3 * t ** 2 + 1;
+		const h10 = t ** 3 - 2 * t ** 2 + t;
+		const h01 = -2 * t ** 3 + 3 * t ** 2;
+		const h11 = t ** 3 - t ** 2;
 
+		// Calculate interpolated point [ p(t)=h0⋅h00+v0⋅h10+h1⋅h01+v1⋅h11 ]
+		const p = new THREE.Vector3()
+			.addScaledVector(h0, h00)
+			.addScaledVector(v0, h10)
+			.addScaledVector(h1, h01)
+			.addScaledVector(v1, h11);
+
+		// Derivatives of base polynomials
+		const h00Prime = 6 * t ** 2 - 6 * t;
+		const h10Prime = 3 * t ** 2 - 4 * t + 1;
+		const h01Prime = -6 * t ** 2 + 6 * t;
+		const h11Prime = 3 * t ** 2 - 2 * t;
+
+		// Calculate tangent [ dp(t)=h0⋅h00′+v0⋅h10′+h1⋅h01′+v1⋅h11′ ]
+		const dp = new THREE.Vector3()
+			.addScaledVector(h0, h00Prime)
+			.addScaledVector(v0, h10Prime)
+			.addScaledVector(h1, h01Prime)
+			.addScaledVector(v1, h11Prime);
+
+		dp.normalize();
+		//console.log([p, dp]);
+		return [p, dp];
 	},
 
 
