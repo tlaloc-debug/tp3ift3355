@@ -14,19 +14,6 @@ class Node {
 	}
 }
 
-function getNodeAngle(nodeA, nodeB) {
-
-	// get vectors
-	var vectorA = new THREE.Vector3().subVectors(nodeA.p1, nodeA.p0);
-	var vectorB = new THREE.Vector3().subVectors(nodeB.p1, nodeB.p0);
-
-	// get Angle
-	var [, angle] = TP3.Geometry.findRotation(vectorA, vectorB);
-
-	return angle;
-}
-
-
 TP3.Geometry = {
 
 	simplifySkeleton: function (rootNode, rotationThreshold = 0.0001) {
@@ -44,7 +31,12 @@ TP3.Geometry = {
 				if (child.childNode.length === 1) {
 					var grandChild = child.childNode[0];
 
-					var angle = getNodeAngle(child, grandChild);
+					// create vectors
+					var vectorA = new THREE.Vector3().subVectors(child.p1, child.p0);
+					var vectorB = new THREE.Vector3().subVectors(grandChild.p1, grandChild.p0);
+
+					// get Angle
+					var [, angle] = TP3.Geometry.findRotation(vectorA, vectorB);
 					//console.log(angle)
 
 					if (angle < rotationThreshold) {
@@ -68,6 +60,7 @@ TP3.Geometry = {
 		//TODO
 		function generateNodeSections(node) {
 			node.sections = [];
+			node.centers = [];
 
 			const points = [];
 			const tangents = [];
@@ -93,7 +86,7 @@ TP3.Geometry = {
 				}
 			} else {
 				// In case the branch has no children (last branches of the tree) the same vector (p1 - p0)
-				// is used for both tangents (the branch does not suffer courvature)
+				// is used for both tangents (the branch does not suffer curvature)
 				for (let i = 0; i <= lengthDivisions; i++) {
 					const t = i / lengthDivisions;
 
@@ -136,8 +129,8 @@ TP3.Geometry = {
 				// We might have a better result if we choose the "curvier" curvature instead of the first one.
 				if (node.sections.length <= lengthDivisions) {
 					node.sections.push(section);
+					node.centers.push({ center: center, radius: radius });
 				}
-
 			}
 
 			// Recursion for child nodes
