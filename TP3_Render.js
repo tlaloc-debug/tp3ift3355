@@ -190,28 +190,28 @@ TP3.Render = {
 		let segments = rootNode.sections.length;
 		let sidesNumber = rootNode.sections[0].length;
 
-		// Dibujar los primeros 5 segmentos (o menos si hay menos de 5)
-		let maxSegmentsToDraw = Math.min(4, segments);  // Asegura que no se dibujen más de los disponibles
+		// Variable pour contrôler combien de segments sont dessinés pour faire des tests.
+		let maxSegmentsToDraw = Math.min(4, segments);
 
 		for (let segmentIndex = 0; segmentIndex < maxSegmentsToDraw; segmentIndex++) {
-			// Dibujar el segmento actual
+
 			for (let k = 0; k < sidesNumber; k++) {
 				let j = k % sidesNumber;
-				let jp1 = (j + 1) % sidesNumber; // Circular index for the next side
+				let jp1 = (j + 1) % sidesNumber;
 
-				// Primer triángulo (orden de vértices corregido para normales hacia afuera)
+				// Premier triangle (ordre des sommets corrigé pour des normales orientées vers l'extérieur).
 				let vertices = [];
 				let p1 = new THREE.Vector3(rootNode.sections[segmentIndex][j].x, rootNode.sections[segmentIndex][j].y, rootNode.sections[segmentIndex][j].z);
 				let p2 = new THREE.Vector3(rootNode.sections[segmentIndex + 1][j].x, rootNode.sections[segmentIndex + 1][j].y, rootNode.sections[segmentIndex + 1][j].z);
 				let p3 = new THREE.Vector3(rootNode.sections[segmentIndex][jp1].x, rootNode.sections[segmentIndex][jp1].y, rootNode.sections[segmentIndex][jp1].z);
 
-				// Cambiar el orden de los vértices para que la normal apunte hacia afuera
+				// Changer l'ordre des sommets pour que la normale pointe vers l'extérieur.
 				vertices.push(p1.x, p1.y, p1.z, p3.x, p3.y, p3.z, p2.x, p2.y, p2.z);
 				let geometry = this.createGeometry(vertices);
 				let trunkMesh = new THREE.Mesh(geometry, branchMaterial);
 				scene.add(trunkMesh);
 
-				// Segundo triángulo (orden de vértices corregido para normales hacia afuera)
+				// Deuxième triangle (ordre des sommets corrigé pour des normales orientées vers l'extérieur).
 				vertices = [];
 				let t2 = p2;
 				let t3 = p3;
@@ -220,7 +220,7 @@ TP3.Render = {
 				p2 = t2;
 				p3 = new THREE.Vector3(rootNode.sections[segmentIndex + 1][jp1].x, rootNode.sections[segmentIndex + 1][jp1].y, rootNode.sections[segmentIndex + 1][jp1].z);
 
-				// Cambiar el orden de los vértices para que la normal apunte hacia afuera
+				// Changer l'ordre des sommets pour que la normale pointe vers l'extérieur.
 				vertices.push(p1.x, p1.y, p1.z, p3.x, p3.y, p3.z, p2.x, p2.y, p2.z);
 				geometry = this.createGeometry(vertices);
 				trunkMesh = new THREE.Mesh(geometry, branchMaterial);
@@ -228,29 +228,29 @@ TP3.Render = {
 			}
 		}
 
-		// Conectar el último segmento del nodo actual con el segundo segmento de cada hijo
+		// Connecter le dernier segment du nœud actuel avec le deuxième segment de chaque enfant.
 		if (rootNode.childNode && rootNode.childNode.length > 0) {
-			// Recorrer todos los hijos del nodo
+
 			rootNode.childNode.forEach((child) => {
-				// Dibujar la conexión entre el último segmento del nodo actual y el segundo segmento del hijo
+				// Dessiner la connexion entre le dernier segment du nœud actuel et le deuxième segment de l'enfant.
 				for (let k = 0; k < sidesNumber; k++) {
 					let j = k % sidesNumber;
 					let jp1 = (j + 1) % sidesNumber;
 
 					let vertices = [];
-					// Último segmento del nodo actual
+					// Dernier segment du nœud actuel.
 					let p1 = new THREE.Vector3(rootNode.sections[segments - 1][j].x, rootNode.sections[segments - 1][j].y, rootNode.sections[segments - 1][j].z);
-					// Segundo segmento del hijo
+					// Deuxième segment de l'enfant.
 					let p2 = new THREE.Vector3(child.sections[1][j].x, child.sections[1][j].y, child.sections[1][j].z);
 					let p3 = new THREE.Vector3(rootNode.sections[segments - 1][jp1].x, rootNode.sections[segments - 1][jp1].y, rootNode.sections[segments - 1][jp1].z);
 
-					// Cambiar el orden de los vértices para que la normal apunte hacia afuera
+					// Changer l'ordre des sommets pour que la normale pointe vers l'extérieur.
 					vertices.push(p1.x, p1.y, p1.z, p3.x, p3.y, p3.z, p2.x, p2.y, p2.z);
 					let geometry = this.createGeometry(vertices);
 					let trunkMesh = new THREE.Mesh(geometry, branchMaterial);
 					scene.add(trunkMesh);
 
-					// Segundo triángulo para la conexión
+					// Deuxième triangle pour la connexion.
 					vertices = [];
 					let t2 = p2;
 					let t3 = p3;
@@ -259,7 +259,7 @@ TP3.Render = {
 					p2 = t2;
 					p3 = new THREE.Vector3(child.sections[1][jp1].x, child.sections[1][jp1].y, child.sections[1][jp1].z);
 
-					// Cambiar el orden de los vértices para que la normal apunte hacia afuera
+					// Changer l'ordre des sommets pour que la normale pointe vers l'extérieur.
 					vertices.push(p1.x, p1.y, p1.z, p3.x, p3.y, p3.z, p2.x, p2.y, p2.z);
 					geometry = this.createGeometry(vertices);
 					trunkMesh = new THREE.Mesh(geometry, branchMaterial);
@@ -334,8 +334,6 @@ TP3.Render = {
 
 		// Start traversal from the root node
 		traverseAndDraw(rootNode);
-
-
 	},
 
 
