@@ -104,9 +104,9 @@ TP3.Geometry = {
 
 				// Generate the orthogonal plane using the tangent vector
 				let normal = new THREE.Vector3(1, 0, 0);
-				if (Math.abs(tangent.dot(normal)) > 0.9) {
-					normal.set(0, 1, 0);
-				}
+				// if (Math.abs(tangent.dot(normal)) > 0.9) {
+				// 	normal.set(0, 1, 0);
+				// }
 				const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize();
 				normal = new THREE.Vector3().crossVectors(binormal, tangent).normalize();
 
