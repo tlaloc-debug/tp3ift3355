@@ -20,40 +20,48 @@ TP3.Geometry = {
 		//TODO
 		//console.log(rootNode);
 
-		// Recursive function to simplify nodes
-		function simplifyNode(currentNode) {
-			for (var i = currentNode.childNode.length - 1; i >= 0; i--) {
-				var child = currentNode.childNode[i];
+		const simplifyNode = (node) => {
 
-				// Call recursively to simplify children first
-				simplifyNode(child);
+			if (node.childNode.length === 0) return node;
 
-				if (child.childNode.length === 1) {
-					var grandChild = child.childNode[0];
+			// Si el nodo tiene exactamente un hijo, evaluamos si debe ser simplificado
+			if (node.childNode.length === 1) {
+				let rootVect = new THREE.Vector3().subVectors(node.p1, node.p0);
+				let childVect = new THREE.Vector3().subVectors(node.childNode[0].p1, node.childNode[0].p0);
+				let [, angle] = this.findRotation(rootVect, childVect);
 
-					// create vectors
-					var vectorA = new THREE.Vector3().subVectors(child.p1, child.p0);
-					var vectorB = new THREE.Vector3().subVectors(grandChild.p1, grandChild.p0);
+				// Si el ángulo es menor al umbral, simplificamos el nodo
+				if (angle < rotationThreshold) {
+					node.a1 = node.childNode[0].a1;
+					node.p1 = node.childNode[0].p1;
+					node.childNode = node.childNode[0].childNode;
 
-					// get Angle
-					var [, angle] = TP3.Geometry.findRotation(vectorA, vectorB);
-					//console.log(angle)
-
-					if (angle < rotationThreshold) {
-
-						currentNode.childNode[i] = grandChild;
-						grandChild.parentNode = currentNode;
-
-						grandChild.p0 = currentNode.p1;
-						grandChild.a0 = currentNode.a1;
-
+					if (node.childNode.length > 0) {
+						for (let i = 0; i < node.childNode.length; i++) {
+							node.childNode[i].a0 = node.a1;
+							node.childNode[i].p0 = node.p1;
+							node.childNode[i].parentNode = node;
+						}
 					}
-				}
-			}
-		}
 
-		simplifyNode(rootNode);
-		return rootNode;
+					// Volvemos a simplificar el nodo actual
+					return simplifyNode(node);
+				} else {
+					// De lo contrario, intentamos simplificar su hijo
+					node.childNode[0] = simplifyNode(node.childNode[0]);
+					return node;
+				}
+			} else {
+				// Si el nodo tiene múltiples hijos, simplificamos cada uno de ellos
+				for (let i = 0; i < node.childNode.length; i++) {
+					node.childNode[i] = simplifyNode(node.childNode[i]);
+				}
+				return node;
+			}
+		};
+
+		// Llamada inicial a la función auxiliar
+		return simplifyNode(rootNode);
 	},
 
 	generateSegmentsHermite: function (rootNode, lengthDivisions = 4, radialDivisions = 8) {

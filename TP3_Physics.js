@@ -52,38 +52,38 @@ TP3.Physics = {
 		// TODO: Projection du mouvement, force de restitution et amortissement de la velocite
 		// Calcul de la nouvelle position
 		let newPos = node.p1.clone().add(node.vel.clone().multiplyScalar(dt));
+		let oldPos = node.p1.clone()
 
-		// Calcular las direcciones normalizadas
-		let directionInitial = node.p1.clone().sub(node.p0).normalize();
-		let directionCurrent = newPos.sub(node.p0).normalize();
+		// --- AJOUT : Projection pour conserver la longueur ---
+		if(node.parentNode !== null) {
+			node.p1.applyMatrix4(node.parentNode.transformationMatrix);
+			node.p1.applyMatrix4(node.parentNode.transformationMatrix);
+		}
 
-		// Calcular el eje de rotación
-		let rotationAxis = new THREE.Vector3().crossVectors(directionInitial, directionCurrent).normalize();
+		let directionInitial = oldPos.clone().sub(node.p0).normalize();
+		let directionCurrent = newPos.clone().sub(node.p0).normalize();
 
-		// Calcular el ángulo de rotación
-		let angle = Math.acos(THREE.MathUtils.clamp(directionCurrent.dot(directionInitial), -1, 1)); // Clamp para evitar errores numéricos
-		// Crear la matriz de rotación
-		let rotationMatrix = new THREE.Matrix4().makeRotationAxis(rotationAxis, angle);
+		let axis = new THREE.Vector3().crossVectors(directionInitial, directionCurrent).normalize();
+		let angle = Math.acos(directionInitial.dot(directionCurrent));
+		let rotationMatrix = new THREE.Matrix4().makeRotationAxis(axis, angle);
 
-		node.p1.copy(node.p1.clone().applyMatrix4(rotationMatrix));
+		node.p1.applyMatrix4(rotationMatrix);
 
-		// 2. Calcular la nueva velocidad proyectada
-		let newVelocity = node.p1.clone().sub(node.p0).divideScalar(dt);
-		// 3. Reemplazar la velocidad antigua
-		node.vel.copy(newVelocity);
+		let trueVelocity = node.p1.clone().sub(oldPos).divideScalar(dt);
+		node.vel.copy(trueVelocity);
 
-		// 1. Calcular direcciones inicial y actual
-		directionInitial = previousPos.sub(node.p0).normalize();
-		directionCurrent = node.p1.clone().sub(node.p0).normalize();
+		let posAfter = node.p1.clone().sub(node.vel.clone().multiplyScalar(dt))
+		//node.p1.copy(posAfter);
 
-		// 2. Calcular el ángulo entre las direcciones
-		angle = Math.acos(THREE.MathUtils.clamp(directionCurrent.dot(directionInitial), -1, 1)); // Clamp para evitar errores numéricos
-
-		// 3. Calcular la velocidad de restitución
-		let restitutionVelocity = directionCurrent.clone().multiplyScalar(Math.pow(angle, 2) * node.a0 * 1000);
-
-		// 4. Añadir la velocidad de restitución a la velocidad total
-		node.vel.sub(restitutionVelocity);
+		// let newDirectionInitial = node.p1.clone().sub(node.p0).normalize();
+		// let newDirectionFinal = posAfter.clone().sub(node.p0).normalize();
+		// let newAxis = new THREE.Vector3().crossVectors(newDirectionInitial, newDirectionFinal).normalize();
+		// let newAngle = Math.acos(newDirectionInitial.dot(newDirectionFinal));
+		// let newRotationMatrix = new THREE.Matrix4().makeRotationAxis(newAxis, newAngle);
+		node.p1.copy(node.p1.clone().sub(node.vel.clone().multiplyScalar(dt)));
+		//node.p1.applyMatrix4(newRotationMatrix);
+		node.vel.multiplyScalar(0.7);
+		node.transformationMatrix = rotationMatrix;
 
 		// Appel recursif sur les enfants
 		for (var i = 0; i < node.childNode.length; i++) {

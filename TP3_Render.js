@@ -9,66 +9,66 @@ TP3.Render = {
 		var appleMaterial = new THREE.MeshPhongMaterial({ color: 0xFF0000 });
 
 		// Recursive function to traverse the tree and draw branches
-		function traverseTree(node) {
-			if (node.childNode.length > 0) {
-				for (var i = 0; i < node.childNode.length; i++) {
-					var child = node.childNode[i];
+		function traverseTree(rootNode) {
+			if (rootNode.childNode.length > 0) {
+				for (var i = 0; i < rootNode.childNode.length; i++) {
+					var child = rootNode.childNode[i];
 
 					// Add branches
-					TP3.Render.addBranch(node, child, scene, branchMaterial, radialDivisions);
+					TP3.Render.addBranch(rootNode, child, scene, branchMaterial, radialDivisions);
 
 					// Add leaves
-					if (node.a0 < alpha * leavesCutoff) {
+					if (rootNode.a0 < alpha * leavesCutoff) {
 						for (var j = 0; j < leavesDensity; j++) {
-							TP3.Render.addLeaves(node, child, scene, alpha, leavesCutoff, leafMaterial);
+							TP3.Render.addLeaves(rootNode, child, scene, alpha, leavesCutoff, leafMaterial);
 						}
 
 						// Add Apples
-						if (Math.random() < applesProbability) TP3.Render.addPomme(node, scene, alpha, appleMaterial);
+						if (Math.random() < applesProbability) TP3.Render.addPomme(rootNode, scene, alpha, appleMaterial);
 					}
 
 					// Recursively draw branches for the child
 					traverseTree(child);
 				}
 			} else {
-				// No children (terminal node), create a fake child at p1 to point the branch correctly
+				// No children (terminal rootNode), create a fake child at p1 to point the branch correctly
 				var fakeChild = {
-					p0: node.p1,
-					p1: new THREE.Vector3(node.p1.x, node.p1.y + alpha, node.p1.z),
-					a0: node.a0,
-					a1: node.a1,
+					p0: rootNode.p1,
+					p1: new THREE.Vector3(rootNode.p1.x, rootNode.p1.y + alpha, rootNode.p1.z),
+					a0: rootNode.a0,
+					a1: rootNode.a1,
 					childNode: []
 				};
 
-				// Process the branch for the terminal node (using the fake child)
-				TP3.Render.addBranch(node, fakeChild, scene, branchMaterial, radialDivisions);
+				// Process the branch for the terminal rootNode (using the fake child)
+				TP3.Render.addBranch(rootNode, fakeChild, scene, branchMaterial, radialDivisions);
 
 				for (var l = 0; l < leavesDensity; l++) {
-					TP3.Render.addLeaves(node, fakeChild, scene, alpha, leavesCutoff, leafMaterial);
+					TP3.Render.addLeaves(rootNode, fakeChild, scene, alpha, leavesCutoff, leafMaterial);
 				}
 			}
 
 		}
 
-		// Start the recursive traversal from the root node
+		// Start the recursive traversal from the root rootNode
 		traverseTree(rootNode);
 	},
 
 	// Function to add the branch body
-	addBranch: function(node, child, scene, branchMaterial, radialDivisions) {
+	addBranch: function(rootNode, child, scene, branchMaterial, radialDivisions) {
 		// Calculate the direction and length of the branch
-		var direction = new THREE.Vector3().subVectors(child.p0, node.p0);
-		var length = new THREE.Vector3().subVectors(node.p1, node.p0).length();
+		var direction = new THREE.Vector3().subVectors(child.p0, rootNode.p0);
+		var length = new THREE.Vector3().subVectors(rootNode.p1, rootNode.p0).length();
 
 		// Create cylinder geometry for the branch (from a0 to a1 radius)
-		var branchGeometry = new THREE.CylinderBufferGeometry(node.a1, node.a0, length, radialDivisions);
+		var branchGeometry = new THREE.CylinderBufferGeometry(rootNode.a1, rootNode.a0, length, radialDivisions);
 		// Shift the geometry so its base is at (0, 0, 0) instead of being centered
 		branchGeometry.translate(0, length / 2, 0);
 
 		var branchMesh = new THREE.Mesh(branchGeometry, branchMaterial);
-		branchMesh.position.copy(node.p0);
+		branchMesh.position.copy(rootNode.p0);
 
-		// Make the Y-axis point towards the next branch (child node)
+		// Make the Y-axis point towards the next branch (child rootNode)
 		var up = new THREE.Vector3(0, 1, 0);
 		var axis = new THREE.Vector3().crossVectors(up, direction).normalize();
 		var angle = up.angleTo(direction);
@@ -79,14 +79,14 @@ TP3.Render = {
 	},
 
 	// Function to add leaves to a branch
-	addLeaves: function(node, child, scene, alpha, leavesCutoff, leafMaterial) {
+	addLeaves: function(rootNode, child, scene, alpha, leavesCutoff, leafMaterial) {
 
 		var leafGeometry = new THREE.PlaneGeometry(alpha, alpha);
 		var leafMesh = new THREE.Mesh(leafGeometry, leafMaterial);
 
 		// Random position along the branch (between p0 and p1)
 		var t = Math.random();
-		var randomPoint = new THREE.Vector3().lerpVectors(node.p0, child.p0, t);
+		var randomPoint = new THREE.Vector3().lerpVectors(rootNode.p0, child.p0, t);
 
 		// Random displacement within a radius of alpha/2
 		var offset = new THREE.Vector3(
@@ -111,12 +111,12 @@ TP3.Render = {
 	},
 
 	// Function to add apples to a branch
-	addPomme: function(node, scene, alpha, appleMaterial) {
+	addPomme: function(rootNode, scene, alpha, appleMaterial) {
 
 		var appleGeometry = new THREE.BoxGeometry(alpha, alpha, alpha);
 		var appleMesh = new THREE.Mesh(appleGeometry, appleMaterial);
 
-		appleMesh.position.copy(node.p0);
+		appleMesh.position.copy(rootNode.p0);
 
 		// Add a little variability in position so that the apple is not exactly in the center
 		appleMesh.position.x += (Math.random() - 0.5) * alpha;
@@ -128,8 +128,8 @@ TP3.Render = {
 	},
 
 	// Function to add leaves to a branch
-	addLeavesHermite: function(node, child, scene, alpha, leavesCutoff, leafMaterial) {
-
+	addLeavesHermite: function(rootNode, child, scene, alpha, leavesCutoff) {
+		const leafMaterial = new THREE.MeshPhongMaterial({ color: 0x3A5F0B, side: THREE.DoubleSide });
 		var triangleGeometry = new THREE.BufferGeometry();
 		var vertices = new Float32Array([
 			0, alpha / 2, 0,
@@ -143,7 +143,7 @@ TP3.Render = {
 
 		// Random position along the branch (between p0 and p1)
 		var t = Math.random();
-		var randomPoint = new THREE.Vector3().lerpVectors(node.p0, child.p0, t);
+		var randomPoint = new THREE.Vector3().lerpVectors(rootNode.p0, child.p0, t);
 
 		// Random displacement within a radius of alpha/2
 		var offset = new THREE.Vector3(
@@ -168,14 +168,14 @@ TP3.Render = {
 	},
 
 	// Function to add apples to a branch
-	addPommeHermite: function(node, scene, alpha, appleMaterial) {
-
+	addPommeHermite: function(rootNode, scene, alpha) {
+		const appleMaterial = new THREE.MeshPhongMaterial({ color: 0xFF0000 });
 		// Create spherical geometry for the apple
 		var appleGeometry = new THREE.SphereBufferGeometry(alpha / 2, 16, 16);
 		var appleMesh = new THREE.Mesh(appleGeometry, appleMaterial);
 
-		// Set the initial position of the apple to the node's position
-		appleMesh.position.copy(node.p0);
+		// Set the initial position of the apple to the rootNode's position
+		appleMesh.position.copy(rootNode.p0);
 
 		// Add a little variability in position so that the apple is not exactly in the center
 		appleMesh.position.x += (Math.random() - 0.5) * alpha;
@@ -186,162 +186,145 @@ TP3.Render = {
 		scene.add(appleMesh);
 	},
 
-	drawBody: function (rootNode, scene, branchMaterial) {
-		let segments = rootNode.sections.length;
-		let sidesNumber = rootNode.sections[0].length;
+	drawBody: function (node, scene, alpha, leavesCutoff, leavesDensity, applesProbability, branchList = []) {
 
-		// Variable pour contrôler combien de segments sont dessinés pour faire des tests.
-		let maxSegmentsToDraw = Math.min(4, segments);
+		const indexList = [];
+		const vertices = [];
+		const indices = [];
+		let currentIdx = 0;
 
-		for (let segmentIndex = 0; segmentIndex < maxSegmentsToDraw; segmentIndex++) {
+		// Process points for vertices and indices
+		for (let i = 0; i < node.sections.length; i++) {
+			const subIndexList = [];
 
-			for (let k = 0; k < sidesNumber; k++) {
-				let j = k % sidesNumber;
-				let jp1 = (j + 1) % sidesNumber;
+			// Add vertices for all sections
+			for (let j = 0; j < node.sections[i].length; j++) {
+				const point = node.sections[i][j];
+				vertices.push(point.x, point.y, point.z);
+				subIndexList.push(currentIdx);
+				currentIdx++;
+			}
+			indexList.push(subIndexList);
+		}
 
-				// Premier triangle (ordre des sommets corrigé pour des normales orientées vers l'extérieur).
-				let vertices = [];
-				let p1 = new THREE.Vector3(rootNode.sections[segmentIndex][j].x, rootNode.sections[segmentIndex][j].y, rootNode.sections[segmentIndex][j].z);
-				let p2 = new THREE.Vector3(rootNode.sections[segmentIndex + 1][j].x, rootNode.sections[segmentIndex + 1][j].y, rootNode.sections[segmentIndex + 1][j].z);
-				let p3 = new THREE.Vector3(rootNode.sections[segmentIndex][jp1].x, rootNode.sections[segmentIndex][jp1].y, rootNode.sections[segmentIndex][jp1].z);
+		// Create faces between sections
+		if (node.childNode.length < 2) {
+			for (let segmentIndex = 0; segmentIndex < node.sections.length - 1; segmentIndex++) {
+				const currentSection = indexList[segmentIndex];
+				const nextSection = indexList[segmentIndex + 1];
 
-				// Changer l'ordre des sommets pour que la normale pointe vers l'extérieur.
-				vertices.push(p1.x, p1.y, p1.z, p3.x, p3.y, p3.z, p2.x, p2.y, p2.z);
-				let geometry = this.createGeometry(vertices);
-				let trunkMesh = new THREE.Mesh(geometry, branchMaterial);
-				scene.add(trunkMesh);
+				for (let k = 0; k < currentSection.length; k++) {
+					const j = k;
+					const jp1 = (j + 1) % currentSection.length;
+					// First triangle (ensure proper order for outward-facing normals)
+					indices.push(currentSection[jp1],  nextSection[j], currentSection[j]);
+					// Second triangle (ensure proper order for outward-facing normals)
+					indices.push(	nextSection[jp1], nextSection[j], currentSection[jp1]);
+				}
+			}
+		} else {
+			for (let segmentIndex = 0; segmentIndex < node.sections.length - 2; segmentIndex++) {
+				const currentSection = indexList[segmentIndex];
+				const nextSection = indexList[segmentIndex + 1];
 
-				// Deuxième triangle (ordre des sommets corrigé pour des normales orientées vers l'extérieur).
-				vertices = [];
-				let t2 = p2;
-				let t3 = p3;
+				for (let k = 0; k < currentSection.length; k++) {
+					const j = k;
+					const jp1 = (j + 1) % currentSection.length;
+					// First triangle (ensure proper order for outward-facing normals)
+					indices.push(currentSection[jp1],  nextSection[j], currentSection[j]);
+					// Second triangle (ensure proper order for outward-facing normals)
+					indices.push(	nextSection[jp1], nextSection[j], currentSection[jp1]);
+				}
+			}
+			const lastSection = indexList[indexList.length - 2];
+			const firstChildNode = node.childNode[0];
+			const firstChildSection = [];
 
-				p1 = t3;
-				p2 = t2;
-				p3 = new THREE.Vector3(rootNode.sections[segmentIndex + 1][jp1].x, rootNode.sections[segmentIndex + 1][jp1].y, rootNode.sections[segmentIndex + 1][jp1].z);
+			// Add first section vertices of the child
+			for (let j = 0; j < firstChildNode.sections[0].length; j++) {
+				const point = firstChildNode.sections[0][j];
+				vertices.push(point.x, point.y, point.z);
+				firstChildSection.push(currentIdx);
+				currentIdx++;
+			}
 
-				// Changer l'ordre des sommets pour que la normale pointe vers l'extérieur.
-				vertices.push(p1.x, p1.y, p1.z, p3.x, p3.y, p3.z, p2.x, p2.y, p2.z);
-				geometry = this.createGeometry(vertices);
-				trunkMesh = new THREE.Mesh(geometry, branchMaterial);
-				scene.add(trunkMesh);
+			for (let k = 0; k < lastSection.length; k++) {
+				const j = k;
+				const jp1 = (j + 1) % lastSection.length;
+
+				// First triangle (ensure proper order for outward-facing normals)
+				indices.push(lastSection[jp1], firstChildSection[j], lastSection[j]);
+				// Second triangle (ensure proper order for outward-facing normals)
+				indices.push(firstChildSection[jp1], firstChildSection[j], lastSection[jp1]);
 			}
 		}
 
-		// Connecter le dernier segment du nœud actuel avec le deuxième segment de chaque enfant.
-		if (rootNode.childNode && rootNode.childNode.length > 0) {
 
-			rootNode.childNode.forEach((child) => {
-				// Dessiner la connexion entre le dernier segment du nœud actuel et le deuxième segment de l'enfant.
-				for (let k = 0; k < sidesNumber; k++) {
-					let j = k % sidesNumber;
-					let jp1 = (j + 1) % sidesNumber;
+		// Create branch geometry
+		const branchBuffer = new THREE.BufferGeometry();
+		branchBuffer.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+		branchBuffer.setIndex(indices);
+		branchBuffer.computeVertexNormals();
+		branchList.push(branchBuffer);
 
-					let vertices = [];
-					// Dernier segment du nœud actuel.
-					let p1 = new THREE.Vector3(rootNode.sections[segments - 1][j].x, rootNode.sections[segments - 1][j].y, rootNode.sections[segments - 1][j].z);
-					// Deuxième segment de l'enfant.
-					let p2 = new THREE.Vector3(child.sections[1][j].x, child.sections[1][j].y, child.sections[1][j].z);
-					let p3 = new THREE.Vector3(rootNode.sections[segments - 1][jp1].x, rootNode.sections[segments - 1][jp1].y, rootNode.sections[segments - 1][jp1].z);
+		if (node.childNode.length > 0) {
+			for (var i = 0; i < node.childNode.length; i++) {
+				var child = node.childNode[i];
 
-					// Changer l'ordre des sommets pour que la normale pointe vers l'extérieur.
-					vertices.push(p1.x, p1.y, p1.z, p3.x, p3.y, p3.z, p2.x, p2.y, p2.z);
-					let geometry = this.createGeometry(vertices);
-					let trunkMesh = new THREE.Mesh(geometry, branchMaterial);
-					scene.add(trunkMesh);
+				// Add leaves
+				if (node.a0 < alpha * leavesCutoff) {
+					for (var j = 0; j < leavesDensity; j++) {
+						TP3.Render.addLeavesHermite(node, child, scene, alpha, leavesCutoff);
+					}
 
-					// Deuxième triangle pour la connexion.
-					vertices = [];
-					let t2 = p2;
-					let t3 = p3;
-
-					p1 = t3;
-					p2 = t2;
-					p3 = new THREE.Vector3(child.sections[1][jp1].x, child.sections[1][jp1].y, child.sections[1][jp1].z);
-
-					// Changer l'ordre des sommets pour que la normale pointe vers l'extérieur.
-					vertices.push(p1.x, p1.y, p1.z, p3.x, p3.y, p3.z, p2.x, p2.y, p2.z);
-					geometry = this.createGeometry(vertices);
-					trunkMesh = new THREE.Mesh(geometry, branchMaterial);
-					scene.add(trunkMesh);
+					// Add Apples
+					if (Math.random() < applesProbability) TP3.Render.addPommeHermite(node, scene, alpha);
 				}
-			});
+			}
+		} else {
+			// No children (terminal rootNode), create a fake child at p1 to point the branch correctly
+			var fakeChild = {
+				p0: node.p1,
+				p1: new THREE.Vector3(node.p1.x, node.p1.y + alpha, node.p1.z),
+				a0: node.a0,
+				a1: node.a1,
+				childNode: []
+			};
+
+			for (var l = 0; l < leavesDensity; l++) {
+				TP3.Render.addLeavesHermite(node, fakeChild, scene, alpha, leavesCutoff);
+			}
 		}
-	},
 
+		// Traverse child nodes
+		if (node.childNode && Array.isArray(node.childNode)) {
+			for (const childNode of node.childNode) {
+				this.drawBody(childNode, scene, alpha, leavesCutoff, leavesDensity, applesProbability, branchList);
+			}
+		}
 
-	createGeometry: function (vertices) {
-		// Helper function to create geometry
-		let f32vertices = new Float32Array(vertices);
-		let geometry = new THREE.BufferGeometry();
-		geometry.setAttribute('position', new THREE.BufferAttribute(f32vertices, 3));
-		geometry.setIndex([0, 1, 2]); // Triangle indices
-		geometry.computeVertexNormals();
-		return geometry;
+		// Merge and add geometries if root rootNode
+		if (!node.parentNode) {
+			const mergedBranches = THREE.BufferGeometryUtils.mergeBufferGeometries(branchList);
+			scene.add(new THREE.Mesh(mergedBranches, new THREE.MeshLambertMaterial({ color: 0x8B5A2B })));
+		}
 	},
 
 	drawTreeHermite: function (rootNode, scene, alpha, leavesCutoff = 0.1, leavesDensity = 10, applesProbability = 0.05, matrix = new THREE.Matrix4()) {
-		// Create the material for the trunk
-		let branchMaterial = new THREE.MeshLambertMaterial({ color: 0x8B5A2B });
-		var leafMaterial = new THREE.MeshPhongMaterial({ color: 0x3A5F0B, side: THREE.DoubleSide });
-		var appleMaterial = new THREE.MeshPhongMaterial({ color: 0xFF0000 });
 
-		// Recursive function to traverse nodes and draw branches
-		const traverseAndDraw = (node) => {
-			if (!node) return;
+		const branchList = [];
+		// Draw tree body
+		this.drawBody(rootNode, scene, alpha, leavesCutoff, leavesDensity, applesProbability, branchList);
 
-			// Draw the current node's body
-			this.drawBody(node, scene, branchMaterial);
-			if (node.childNode.length > 0) {
-				for (var i = 0; i < node.childNode.length; i++) {
-					var child = node.childNode[i];
-
-					// Add leaves
-					if (node.a0 < alpha * leavesCutoff) {
-						for (var j = 0; j < leavesDensity; j++) {
-							TP3.Render.addLeavesHermite(node, child, scene, alpha, leavesCutoff, leafMaterial);
-						}
-
-						// Add Apples
-						if (Math.random() < applesProbability) TP3.Render.addPommeHermite(node, scene, alpha, appleMaterial);
-					}
-				}
-			} else {
-				// No children (terminal node), create a fake child at p1 to point the branch correctly
-				var fakeChild = {
-					p0: node.p1,
-					p1: new THREE.Vector3(node.p1.x, node.p1.y + alpha, node.p1.z),
-					a0: node.a0,
-					a1: node.a1,
-					childNode: []
-				};
-
-				// Process the branch for the terminal node (using the fake child)
-				TP3.Render.addBranch(node, fakeChild, scene, branchMaterial, radialDivisions);
-
-				for (var l = 0; l < leavesDensity; l++) {
-					TP3.Render.addLeaves(node, fakeChild, scene, alpha, leavesCutoff, leafMaterial);
-				}
-			}
-
-			// Traverse and draw child nodes recursively
-			if (node.childNode) {
-				for (let child of node.childNode) {
-					traverseAndDraw(child); // Recursively traverse all child nodes
-				}
-			}
-		};
-
-		// Start traversal from the root node
-		traverseAndDraw(rootNode);
 	},
-
 
 	updateTreeHermite: function (trunkGeometryBuffer, leavesGeometryBuffer, applesGeometryBuffer, rootNode) {
 		//TODO
 	},
 
 	drawTreeSkeleton: function (rootNode, scene, color = 0xffffff, matrix = new THREE.Matrix4()) {
+		console.log(rootNode)
+
 		let child = 0;
 		var stack = [];
 		stack.push(rootNode);
