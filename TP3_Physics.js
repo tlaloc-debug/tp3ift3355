@@ -35,60 +35,66 @@ TP3.Physics = {
 	},
 
 	applyForces: function (node, dt, time) {
-
-		var u = Math.sin(1 * time) * 4;
-		u += Math.sin(2.5 * time) * 2;
-		u += Math.sin(5 * time) * 0.4;
-
-		var v = Math.cos(1 * time + 56485) * 4;
-		v += Math.cos(2.5 * time + 56485) * 2;
-		v += Math.cos(5 * time + 56485) * 0.4;
-
-		// Ajouter le vent
+		if (!node.childNode) return;
+	
+		// Calcul des forces externes (vent et gravité)
+		const u = Math.sin(1 * time) * 4 + Math.sin(2.5 * time) * 2 + Math.sin(5 * time) * 0.4;
+		const v = Math.cos(1 * time + 56485) * 4 + Math.cos(2.5 * time + 56485) * 2 + Math.cos(5 * time + 56485) * 0.4;
+	
+		// Ajouter le vent et la gravité
 		node.vel.add(new THREE.Vector3(u / Math.sqrt(node.mass), 0, v / Math.sqrt(node.mass)).multiplyScalar(dt));
-		// Ajouter la gravite
 		node.vel.add(new THREE.Vector3(0, -node.mass, 0).multiplyScalar(dt));
-
-		// TODO: Projection du mouvement, force de restitution et amortissement de la velocite
-		// Calcul de la nouvelle position
-		let newPos = node.p1.clone().add(node.vel.clone().multiplyScalar(dt));
-		let oldPos = node.p1.clone()
-
-		// --- AJOUT : Projection pour conserver la longueur ---
-		if(node.parentNode !== null) {
-			node.p1.applyMatrix4(node.parentNode.transformationMatrix);
-			node.p1.applyMatrix4(node.parentNode.transformationMatrix);
-		}
-
-		let directionInitial = oldPos.clone().sub(node.p0).normalize();
-		let directionCurrent = newPos.clone().sub(node.p0).normalize();
-
-		let axis = new THREE.Vector3().crossVectors(directionInitial, directionCurrent).normalize();
-		let angle = Math.acos(directionInitial.dot(directionCurrent));
-		let rotationMatrix = new THREE.Matrix4().makeRotationAxis(axis, angle);
-
-		node.p1.applyMatrix4(rotationMatrix);
-
-		let trueVelocity = node.p1.clone().sub(oldPos).divideScalar(dt);
-		node.vel.copy(trueVelocity);
-
-		let posAfter = node.p1.clone().sub(node.vel.clone().multiplyScalar(dt))
-		//node.p1.copy(posAfter);
-
-		// let newDirectionInitial = node.p1.clone().sub(node.p0).normalize();
-		// let newDirectionFinal = posAfter.clone().sub(node.p0).normalize();
-		// let newAxis = new THREE.Vector3().crossVectors(newDirectionInitial, newDirectionFinal).normalize();
-		// let newAngle = Math.acos(newDirectionInitial.dot(newDirectionFinal));
-		// let newRotationMatrix = new THREE.Matrix4().makeRotationAxis(newAxis, newAngle);
-		node.p1.copy(node.p1.clone().sub(node.vel.clone().multiplyScalar(dt)));
-		//node.p1.applyMatrix4(newRotationMatrix);
+	
+		// Calcul de la nouvelle position de p1
+		const newP1 = node.p1.clone().addScaledVector(node.vel, dt);
+	
+		// Vecteurs normalisés pour calculer la rotation
+		const norm1 = new THREE.Vector3().subVectors(node.p1, node.p0).normalize(); // Direction actuelle
+		const norm2 = new THREE.Vector3().subVectors(newP1, node.p0).normalize(); // Nouvelle direction
+	
+		// Calcul de la rotation entre norm1 et norm2
+		const axisAngle = TP3.Geometry.findRotation(norm1, norm2);
+		const rotMatrix = new THREE.Matrix4().makeRotationFromQuaternion(
+			new THREE.Quaternion().setFromAxisAngle(axisAngle[0], axisAngle[1])
+		);
+	
+		// Appliquer la matrice de rotation pour conserver la longueur
+		const branchLength = node.p1.clone().sub(node.p0).length(); // Longueur de la branche
+		node.p1.copy(node.p0.clone().addScaledVector(norm1.applyMatrix4(rotMatrix), branchLength));
+	
+		// Mise à jour de la vélocité
+		node.vel.copy(new THREE.Vector3().subVectors(node.p1, newP1).multiplyScalar(1 / dt));
+	
+		// Force de restitution
+		const initDirection = new THREE.Vector3().subVectors(node.p1, node.p0).normalize();
+		const newDirection = new THREE.Vector3().subVectors(node.p1, node.p0).normalize();
+		const restitutionAxisAngle = TP3.Geometry.findRotation(initDirection, newDirection);
+		const restitutionMatrix = new THREE.Matrix4().makeRotationFromQuaternion(
+			new THREE.Quaternion().setFromAxisAngle(restitutionAxisAngle[0], -Math.pow(restitutionAxisAngle[1], 2))
+		);
+		const restitutionVel = initDirection
+			.clone()
+			.applyMatrix4(restitutionMatrix)
+			.multiplyScalar(node.a0 * 1000);
+	
+		node.vel.add(restitutionVel);
+	
+		// Appliquer l'amortissement
 		node.vel.multiplyScalar(0.7);
-		node.transformationMatrix = rotationMatrix;
-
-		// Appel recursif sur les enfants
-		for (var i = 0; i < node.childNode.length; i++) {
+	
+		// Propager les transformations aux enfants
+		for (const child of node.childNode) {
+			const childDir = new THREE.Vector3().subVectors(child.p1, child.p0).normalize();
+			const childLength = child.p1.clone().sub(child.p0).length();
+	
+			// Mettre à jour p0 et p1 de l'enfant
+			child.p0.copy(node.p1);
+			child.p1.copy(node.p1.clone().addScaledVector(childDir.applyMatrix4(rotMatrix), childLength));
+		}
+	
+		// Récursion sur les enfants
+		for (let i = 0; i < node.childNode.length; i++) {
 			this.applyForces(node.childNode[i], dt, time);
 		}
-
 	}
 }
