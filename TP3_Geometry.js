@@ -18,24 +18,23 @@ TP3.Geometry = {
 
 	simplifySkeleton: function (rootNode, rotationThreshold = 0.0001) {
 		//TODO
-		//console.log(rootNode);
 
 		const simplifyNode = (node) => {
-
+			// Si le nœud n'a pas d'enfant, il ne nécessite aucune simplification.
 			if (node.childNode.length === 0) return node;
 
-			// Si el nodo tiene exactamente un hijo, evaluamos si debe ser simplificado
 			if (node.childNode.length === 1) {
 				let rootVect = new THREE.Vector3().subVectors(node.p1, node.p0);
 				let childVect = new THREE.Vector3().subVectors(node.childNode[0].p1, node.childNode[0].p0);
 				let [, angle] = this.findRotation(rootVect, childVect);
 
-				// Si el ángulo es menor al umbral, simplificamos el nodo
+				// Si l'angle de rotation est inférieur au seuil, fusionner le nœud avec son enfant.
 				if (angle < rotationThreshold) {
 					node.a1 = node.childNode[0].a1;
 					node.p1 = node.childNode[0].p1;
 					node.childNode = node.childNode[0].childNode;
 
+					// Met à jour les propriétés des enfants du nœud fusionné, si ils existent.
 					if (node.childNode.length > 0) {
 						for (let i = 0; i < node.childNode.length; i++) {
 							node.childNode[i].a0 = node.a1;
@@ -43,16 +42,16 @@ TP3.Geometry = {
 							node.childNode[i].parentNode = node;
 						}
 					}
-
-					// Volvemos a simplificar el nodo actual
 					return simplifyNode(node);
+					
 				} else {
-					// De lo contrario, intentamos simplificar su hijo
+					// Si l'angle de rotation est supérieur au seuil, simplifier récursivement l'enfant unique.
 					node.childNode[0] = simplifyNode(node.childNode[0]);
 					return node;
 				}
+
 			} else {
-				// Si el nodo tiene múltiples hijos, simplificamos cada uno de ellos
+				// Si le nœud a un plusieurs enfants, simplifier récursivement chaque l'enfant.
 				for (let i = 0; i < node.childNode.length; i++) {
 					node.childNode[i] = simplifyNode(node.childNode[i]);
 				}
@@ -60,73 +59,67 @@ TP3.Geometry = {
 			}
 		};
 
-		// Llamada inicial a la función auxiliar
 		return simplifyNode(rootNode);
 	},
 
 	generateSegmentsHermite: function (rootNode, lengthDivisions = 4, radialDivisions = 8) {
 		//TODO
+
 		function generateNodeSections(node) {
+			// Initialise les propriétés des sections pour le nœud courant.
 			node.sections = [];
 			node.centers = [];
-			node.pommeList = [];
-			node.pommeCenters = [];
-			node.leaveList = [];
-			node.leaveCenters = [];
-			node.leaveRotations = [];
 
-			const points = [];
-			const tangents = [];
+			const points = []; // Points interpolés le long de la courbe.
+			const tangents = []; // Tangentes correspondantes à chaque point.
 
-			// Calculate v0 as the vector from p0 to p1 of the current node
+			// Calcul du vecteur de direction entre p0 et p1 du nœud.
 			const v0 = new THREE.Vector3().subVectors(node.p1, node.p0);
 
+			// Si le nœud a des enfants, génére des courbes Hermite entre p0 du nœud courant et p0 des enfants.
 			if (node.childNode.length > 0) {
-				// Iterate through the child nodes to calculate v1 and create the Hermite curve
 				for (const child of node.childNode) {
-					// Calculate v1 as the vector from p0 to p1 of the child node
 					const v1 = new THREE.Vector3().subVectors(child.p1, child.p0);
 
-					// Generate points along the Hermite curve between node.p0 and child.p0
+					// Générer des points interpolés le long de la courbe Hermite entre node.p0 et child.p0.
 					for (let i = 0; i <= lengthDivisions; i++) {
-						const t = i / lengthDivisions;
+						const t = i / lengthDivisions; // Paramètre d'interpolation normalisé (0 ≤ t ≤ 1).
 
-						// Calculate the interpolated point and tangent at parameter t
+						// Calcule le point interpolé et la tangente correspondante sur la courbe pour le paramètre t.
 						const [point, tangent] = TP3.Geometry.hermite(node.p0, child.p0, v0, v1, t);
+
 						points.push(point);
 						tangents.push(tangent);
 					}
 				}
 			} else {
-				// In case the branch has no children (last branches of the tree) the same vector (p1 - p0)
-				// is used for both tangents (the branch does not suffer curvature)
+				// Si le nœud n'a pas d'enfants, interpole directement entre p0 et p1. 
+				// Cela garantit que la courbe est une ligne droite sans courbure.
 				for (let i = 0; i <= lengthDivisions; i++) {
-					const t = i / lengthDivisions;
+					const t = i / lengthDivisions; // Paramètre d'interpolation normalisé (0 ≤ t ≤ 1).
 
-					// Calculate the interpolated point and tangent at parameter t
+					// Calcule le point interpolé et la tangente correspondante sur la courbe pour le paramètre t.
 					const [point, tangent] = TP3.Geometry.hermite(node.p0, node.p1, v0, v0, t);
+
 					points.push(point);
 					tangents.push(tangent);
 				}
 			}
 
-			// Generate circular sections at each interpolated point along the Hermite curve
+			// Génére des sections circulaires à chaque point interpolé.
 			for (let i = 0; i < points.length; i++) {
 				const center = points[i];
 				const tangent = tangents[i];
 
-				// Generate the orthogonal plane using the tangent vector
+				// Calcul des vecteurs normal et binormal pour définir un plan orthogonal.
 				let normal = new THREE.Vector3(1, 0, 0);
-				// if (Math.abs(tangent.dot(normal)) > 0.9) {
-				// 	normal.set(0, 1, 0);
-				// }
 				const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize();
 				normal = new THREE.Vector3().crossVectors(binormal, tangent).normalize();
 
-				// Use the radii a0 and a1 to scale the circular sections
+				// Interpolation du rayon de la section entre a0 et a1.
 				const radius = node.a0 + (i / (points.length - 1)) * (node.a1 - node.a0);
 
-				// Create a circle of points on the orthogonal plane
+				// Créeun cercle de points sur le plan orthogonal.
 				const section = [];
 				for (let j = 0; j < radialDivisions; j++) {
 					const angle = (2 * Math.PI * j) / radialDivisions;
@@ -136,17 +129,18 @@ TP3.Geometry = {
 					section.push(point);
 				}
 
-				// POSSIBLE OPTIMIZATION
-				// Since we are considering the tangent of the child node to the Hermite curvature,
-				// nodes with two children will create two curvatures. This code selects only the first curvature.
-				// We might have a better result if we choose the "curvier" curvature instead of the first one.
+				// OPTIMISATION POSSIBLE
+				// Comme nous prenons en compte la tangente du nœud enfant pour la courbure de Hermite, les nœuds 
+				// ayant deux enfants créeront deux courbures. Ce code sélectionne uniquement la première courbure. 
+				// Nous pourrions obtenir un meilleur résultat en choisissant la courbure la plus "prononcée" 
+				// au lieu de la première.
 				if (node.sections.length <= lengthDivisions) {
 					node.sections.push(section);
 					node.centers.push({ center: center, radius: radius });
 				}
 			}
 
-			// Recursion for child nodes
+			// Appel récursif pour les nœuds enfants.
 			for (const child of node.childNode) {
 				generateNodeSections(child);
 			}
@@ -156,31 +150,31 @@ TP3.Geometry = {
 
 		generateNodeSections(rootNode);
 		return rootNode;
-
 	},
 
 	hermite: function (h0, h1, v0, v1, t) {
 		//TODO
-		// Hermite basis polynomials
-		const h00 = 2 * t ** 3 - 3 * t ** 2 + 1;
-		const h10 = t ** 3 - 2 * t ** 2 + t;
-		const h01 = -2 * t ** 3 + 3 * t ** 2;
-		const h11 = t ** 3 - t ** 2;
 
-		// Calculate interpolated point [ p(t)=h0⋅h00+v0⋅h10+h1⋅h01+v1⋅h11 ]
+		// Polynômes de base de Hermite pour l'interpolation.
+		const h00 = 2 * t ** 3 - 3 * t ** 2 + 1; 
+		const h10 = t ** 3 - 2 * t ** 2 + t; 		
+		const h01 = -2 * t ** 3 + 3 * t ** 2; 		
+		const h11 = t ** 3 - t ** 2;				
+
+		// Calcul du point interpolé : p(t) = h0 * h00 + v0 * h10 + h1 * h01 + v1 * h11.
 		const p = new THREE.Vector3()
 			.addScaledVector(h0, h00)
 			.addScaledVector(v0, h10)
 			.addScaledVector(h1, h01)
 			.addScaledVector(v1, h11);
 
-		// Derivatives of base polynomials
+		// Calcul des dérivées des polynômes de base pour obtenir la tangente.
 		const h00Prime = 6 * t ** 2 - 6 * t;
 		const h10Prime = 3 * t ** 2 - 4 * t + 1;
 		const h01Prime = -6 * t ** 2 + 6 * t;
 		const h11Prime = 3 * t ** 2 - 2 * t;
 
-		// Calculate tangent [ dp(t)=h0⋅h00′+v0⋅h10′+h1⋅h01′+v1⋅h11′ ]
+		// Calcul de la tangente : dp(t) = h0 * h00' + v0 * h10' + h1 * h01' + v1 * h11'.
 		const dp = new THREE.Vector3()
 			.addScaledVector(h0, h00Prime)
 			.addScaledVector(v0, h10Prime)
@@ -188,7 +182,7 @@ TP3.Geometry = {
 			.addScaledVector(v1, h11Prime);
 
 		dp.normalize();
-		//console.log([p, dp]);
+		// Retourne le point interpolé et la tangente normalisée.
 		return [p, dp];
 	},
 
@@ -224,27 +218,4 @@ TP3.Geometry = {
 
 		return mp.divideScalar(points.length);
 	},
-
-	// Fonction to see Nodes
-	printTreeNodes: function (rootNode) {
-		var stack = [];
-		stack.push(rootNode);
-
-		while (stack.length > 0) {
-			var currentNode = stack.pop();
-
-			console.log("Nodo ID:", currentNode.id || "Sin ID");
-			console.log("  p0:", currentNode.p0);
-			console.log("  p1:", currentNode.p1);
-			console.log("  a0:", currentNode.a0);
-			console.log("  a1:", currentNode.a1);
-			console.log("  Current:", currentNode.parentNode ? currentNode.parentNode.id : "No Node");
-			console.log("  Child:", currentNode.childNode.map(child => child.id || "No ID").join(", "));
-
-			for (var i = 0; i < currentNode.childNode.length; i++) {
-				stack.push(currentNode.childNode[i]);
-			}
-		}
-	}
-
 };
