@@ -69,6 +69,8 @@ TP3.Geometry = {
 		function generateNodeSections(node) {
 			node.sections = [];
 			node.centers = [];
+			node.pommeList = [];
+			node.pommeCenters = [];
 
 			const points = [];
 			const tangents = [];

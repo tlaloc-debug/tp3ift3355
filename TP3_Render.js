@@ -179,17 +179,44 @@ TP3.Render = {
 
 		// Move the sphere to the desired position
 		sphereGeometry.translate(positionX, positionY, positionZ);
+		node.pommeCenters.push(new THREE.Vector3(positionX, positionY, positionZ));
 
 		// Add sphere geometry to the list
 		appleGeometries.push(sphereGeometry);
+		node.pommeList.push(sphereGeometry);
+
 	},
 
-	drawBody: function (node, scene, alpha, leavesCutoff, leavesDensity, applesProbability, branchList = [], appleGeometries = [], leavesGeometries = []) {
+	updatePommeHermite: function(node, position, pomme, appleGeometries, alpha, matrix) {
+		const sphereGeometry = new THREE.SphereBufferGeometry(alpha / 2, 16, 16);
+
+		// Position each sphere randomly
+		const positionX = position.x;
+		const positionY = position.y;
+		const positionZ = position.z;
+
+		let center = new THREE.Vector3(positionX, positionY, positionZ);
+		center.applyMatrix4(matrix);
+
+		// Move the sphere to the desired position
+		sphereGeometry.translate(center.x, center.y, center.z);
+
+		// Add sphere geometry to the list
+		appleGeometries.push(sphereGeometry);
+		//node.pommeList.push(sphereGeometry);
+		position.x = center.x;
+		position.y = center.y;
+		position.z = center.z;
+	},
+
+	drawBody: function (node, scene, alpha, leavesCutoff, leavesDensity, applesProbability,
+						branchList=[], appleGeometries=[], leavesGeometries=[]) {
 
 		const indexList = [];
 		const vertices = [];
 		const indices = [];
 		let currentIdx = 0;
+		node.alpha = alpha;
 
 		// Process points for vertices and indices
 		for (let i = 0; i < node.sections.length; i++) {
@@ -256,7 +283,6 @@ TP3.Render = {
 				indices.push(firstChildSection[jp1], firstChildSection[j], lastSection[jp1]);
 			}
 		}
-
 
 		// Create branch geometry
 		const branchBuffer = new THREE.BufferGeometry();
@@ -297,13 +323,14 @@ TP3.Render = {
 		// Traverse child nodes
 		if (node.childNode && Array.isArray(node.childNode)) {
 			for (const childNode of node.childNode) {
-				this.drawBody(childNode, scene, alpha, leavesCutoff, leavesDensity, applesProbability, branchList, appleGeometries, leavesGeometries);
+				this.drawBody(childNode, scene, alpha, leavesCutoff, leavesDensity, applesProbability,
+					branchList, appleGeometries, leavesGeometries);
 			}
 		}
 
 	},
 
-	drawBody2: function (node, branchList = [], appleGeometries = [], leavesGeometries = []) {
+	drawBody2: function (node, branchList = [], leavesGeometries = []) {
 
 		const indexList = [];
 		const vertices = [];
@@ -383,10 +410,14 @@ TP3.Render = {
 		branchBuffer.computeVertexNormals();
 		branchList.push(branchBuffer);
 
+		// for (let l = 0; l < node.pommeList.length; l++) {
+		// 	pommeVector.push(node.pommeList[l].applyMatrix4(combinedMatrix));
+		// }
+
 		// Traverse child nodes
 		if (node.childNode && Array.isArray(node.childNode)) {
 			for (const childNode of node.childNode) {
-				this.drawBody2(childNode, branchList, appleGeometries, leavesGeometries);
+				this.drawBody2(childNode, branchList, leavesGeometries);
 			}
 		}
 
@@ -397,10 +428,12 @@ TP3.Render = {
 		const branchList = [];
 		const appleGeometries = [];
 		const leavesGeometries = [];
+
 		console.log(rootNode)
 
 		// Draw tree body
-		this.drawBody(rootNode, scene, alpha, leavesCutoff, leavesDensity, applesProbability, branchList, appleGeometries, leavesGeometries);
+		this.drawBody(rootNode, scene, alpha, leavesCutoff, leavesDensity, applesProbability,
+			branchList, appleGeometries, leavesGeometries);
 
 		// Merge and add geometries
 		const mergedBranches = THREE.BufferGeometryUtils.mergeBufferGeometries(branchList);
@@ -414,22 +447,25 @@ TP3.Render = {
 		scene.add(leaveMesh);
 
 		// Apple Mesh
-		const combinedGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(appleGeometries);
-		const appleMesh = new THREE.Mesh(combinedGeometry, new THREE.MeshPhongMaterial({ color: 0xFF0000 }));
+		const mergedPommes = THREE.BufferGeometryUtils.mergeBufferGeometries(appleGeometries);
+		const appleMesh = new THREE.Mesh(mergedPommes, new THREE.MeshPhongMaterial({ color: 0xFF0000 }));
 		scene.add(appleMesh);
 
 		//console.log(mergedBranches.attributes.position.array)
-		return [mergedBranches, mergedLeaves, combinedGeometry];
+		return [mergedBranches, mergedLeaves, mergedPommes];
 	},
 
 	updateTreeHermite: function (trunkGeometryBuffer, leavesGeometryBuffer, applesGeometryBuffer, rootNode) {
 		const branchList = [];
 		const appleGeometries = [];
 		const leavesGeometries = [];
+		const pommeVector = [];
+
 		const stack = [rootNode];
 
 		while (stack.length > 0) {
 			const currentNode = stack.pop();
+
 
 			// Validate and obtain the transformation matrix
 			if (!(currentNode.transformMatrix instanceof THREE.Matrix4)) {
@@ -451,16 +487,32 @@ TP3.Render = {
 				console.log("Invalid sections format in currentNode:", currentNode);
 			}
 
+			if(currentNode.pommeList.length>0) {
+				for (let l = 0; l < currentNode.pommeList.length; l++) {
+					this.updatePommeHermite(currentNode, currentNode.pommeCenters[l], currentNode.pommeList[l],
+						pommeVector, currentNode.alpha, combinedMatrix);
+					//console.log(currentNode)
+				}
+
+			}
+
 			stack.push(...currentNode.childNode);
 
 		}
 
-		this.drawBody2(rootNode, branchList, appleGeometries, leavesGeometries);
+		this.drawBody2(rootNode, branchList, leavesGeometries);
 
 		// Merge and update geometries
 		const mergedBranches = THREE.BufferGeometryUtils.mergeBufferGeometries(branchList);
-		const mergedPositions = mergedBranches.attributes.position.array;
-		for (let i = 0; i < mergedPositions.length; i++) trunkGeometryBuffer[i] = mergedPositions[i];
+		const mergedBranchesPos = mergedBranches.attributes.position.array;
+		for (let i = 0; i < mergedBranchesPos.length; i++) trunkGeometryBuffer[i] = mergedBranchesPos[i];
+
+		//console.log(pommeVector)
+		// Apple Mesh
+		const mergedPommes = THREE.BufferGeometryUtils.mergeBufferGeometries(pommeVector);
+		const mergedPommesPos = mergedPommes.attributes.position.array;
+		//console.log(mergedPommesPos)
+		for (let i = 0; i < mergedPommesPos.length; i++) applesGeometryBuffer[i] = mergedPommesPos[i];
 
 	},
 
