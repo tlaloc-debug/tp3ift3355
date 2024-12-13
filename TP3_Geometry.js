@@ -69,6 +69,11 @@ TP3.Geometry = {
 			// Initialise les propriétés des sections pour le nœud courant.
 			node.sections = [];
 			node.centers = [];
+			node.pommeList = [];
+			node.pommeCenters = [];
+			node.leaveList = [];
+			node.leaveCenters = [];
+			node.leaveRotations = [];
 
 			const points = []; // Points interpolés le long de la courbe.
 			const tangents = []; // Tangentes correspondantes à chaque point.
