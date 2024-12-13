@@ -71,6 +71,9 @@ TP3.Geometry = {
 			node.centers = [];
 			node.pommeList = [];
 			node.pommeCenters = [];
+			node.leaveList = [];
+			node.leaveCenters = [];
+			node.leaveRotations = [];
 
 			const points = [];
 			const tangents = [];

@@ -157,15 +157,23 @@ TP3.Render = {
 		// Final position with the offset applied
 		randomPoint.add(offset);
 
-		triangleGeometry.rotateX(Math.random() * Math.PI);
-		triangleGeometry.rotateY(Math.random() * Math.PI);
-		triangleGeometry.rotateZ(Math.random() * Math.PI);
+		let randomRotation = new THREE.Vector3(
+			Math.random() * Math.PI,
+			Math.random() * Math.PI,
+			Math.random() * Math.PI);
+
+		triangleGeometry.rotateX(randomRotation.x);
+		triangleGeometry.rotateY(randomRotation.y);
+		triangleGeometry.rotateZ(randomRotation.z);
 
 		// Apply the position
 		triangleGeometry.translate(randomPoint.x, randomPoint.y, randomPoint.z);
+		node.leaveCenters.push(new THREE.Vector3(randomPoint.x, randomPoint.y, randomPoint.z));
+		node.leaveRotations.push(randomRotation);
 
 		// Add the triangle to the list
 		leavesGeometries.push(triangleGeometry);
+		node.leaveList.push(triangleGeometry)
 	},
 
 	// Function to add apples to a branch
@@ -190,12 +198,7 @@ TP3.Render = {
 	updatePommeHermite: function(node, position, pomme, appleGeometries, alpha, matrix) {
 		const sphereGeometry = new THREE.SphereBufferGeometry(alpha / 2, 16, 16);
 
-		// Position each sphere randomly
-		const positionX = position.x;
-		const positionY = position.y;
-		const positionZ = position.z;
-
-		let center = new THREE.Vector3(positionX, positionY, positionZ);
+		let center = new THREE.Vector3(position.x, position.y, position.z);
 		center.applyMatrix4(matrix);
 
 		// Move the sphere to the desired position
@@ -204,6 +207,38 @@ TP3.Render = {
 		// Add sphere geometry to the list
 		appleGeometries.push(sphereGeometry);
 		//node.pommeList.push(sphereGeometry);
+		position.x = center.x;
+		position.y = center.y;
+		position.z = center.z;
+	},
+
+	// Function to add leaves to a branch
+	updateLeavesHermite: function(node, position, rotation, leave, leavesGeometries, alpha, matrix) {
+		// Create a triangular geometry
+		const triangleGeometry = new THREE.BufferGeometry();
+
+		// Define the vertices for an equilateral triangle
+		const vertices = new Float32Array([
+			0, alpha / 2, 0,                      // Top vertex
+			-alpha / 2, -alpha / 2, 0,            // Left vertex
+			alpha / 2, -alpha / 2, 0              // Right vertex
+		]);
+
+		triangleGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+		triangleGeometry.computeVertexNormals();
+
+		triangleGeometry.rotateX(rotation.x);
+		triangleGeometry.rotateY(rotation.y);
+		triangleGeometry.rotateZ(rotation.z);
+
+		let center = new THREE.Vector3(position.x, position.y, position.z);
+		center.applyMatrix4(matrix);
+
+		// Apply the position
+		triangleGeometry.translate(center.x, center.y, center.z);
+
+		// Add the triangle to the list
+		leavesGeometries.push(triangleGeometry);
 		position.x = center.x;
 		position.y = center.y;
 		position.z = center.z;
@@ -330,7 +365,7 @@ TP3.Render = {
 
 	},
 
-	drawBody2: function (node, branchList = [], leavesGeometries = []) {
+	drawBody2: function (node, branchList = []) {
 
 		const indexList = [];
 		const vertices = [];
@@ -417,7 +452,7 @@ TP3.Render = {
 		// Traverse child nodes
 		if (node.childNode && Array.isArray(node.childNode)) {
 			for (const childNode of node.childNode) {
-				this.drawBody2(childNode, branchList, leavesGeometries);
+				this.drawBody2(childNode, branchList);
 			}
 		}
 
@@ -457,9 +492,8 @@ TP3.Render = {
 
 	updateTreeHermite: function (trunkGeometryBuffer, leavesGeometryBuffer, applesGeometryBuffer, rootNode) {
 		const branchList = [];
-		const appleGeometries = [];
-		const leavesGeometries = [];
 		const pommeVector = [];
+		const leaveVector = [];
 
 		const stack = [rootNode];
 
@@ -487,20 +521,24 @@ TP3.Render = {
 				console.log("Invalid sections format in currentNode:", currentNode);
 			}
 
-			if(currentNode.pommeList.length>0) {
-				for (let l = 0; l < currentNode.pommeList.length; l++) {
-					this.updatePommeHermite(currentNode, currentNode.pommeCenters[l], currentNode.pommeList[l],
-						pommeVector, currentNode.alpha, combinedMatrix);
-					//console.log(currentNode)
-				}
 
+			for (let l = 0; l < currentNode.pommeList.length; l++) {
+				this.updatePommeHermite(currentNode, currentNode.pommeCenters[l], currentNode.pommeList[l],
+					pommeVector, currentNode.alpha, combinedMatrix);
+				//console.log(currentNode)
+			}
+
+			for (let l = 0; l < currentNode.leaveList.length; l++) {
+				this.updateLeavesHermite(currentNode, currentNode.leaveCenters[l], currentNode.leaveRotations[l],
+					currentNode.leaveList[l], leaveVector, currentNode.alpha, combinedMatrix);
+				//console.log(currentNode)
 			}
 
 			stack.push(...currentNode.childNode);
 
 		}
 
-		this.drawBody2(rootNode, branchList, leavesGeometries);
+		this.drawBody2(rootNode, branchList);
 
 		// Merge and update geometries
 		const mergedBranches = THREE.BufferGeometryUtils.mergeBufferGeometries(branchList);
@@ -513,6 +551,12 @@ TP3.Render = {
 		const mergedPommesPos = mergedPommes.attributes.position.array;
 		//console.log(mergedPommesPos)
 		for (let i = 0; i < mergedPommesPos.length; i++) applesGeometryBuffer[i] = mergedPommesPos[i];
+
+		// Leave Mesh
+		const mergedLeaves = THREE.BufferGeometryUtils.mergeBufferGeometries(leaveVector);
+		const mergedLeavesPos = mergedLeaves.attributes.position.array;
+		//console.log(mergedPommesPos)
+		for (let i = 0; i < mergedLeavesPos.length; i++) leavesGeometryBuffer[i] = mergedLeavesPos[i];
 
 	},
 
