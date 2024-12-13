@@ -303,11 +303,101 @@ TP3.Render = {
 
 	},
 
+	drawBody2: function (node, branchList = [], appleGeometries = [], leavesGeometries = []) {
+
+		const indexList = [];
+		const vertices = [];
+		const indices = [];
+		let currentIdx = 0;
+
+		// Process points for vertices and indices
+		for (let i = 0; i < node.sections.length; i++) {
+			const subIndexList = [];
+
+			// Add vertices for all sections
+			for (let j = 0; j < node.sections[i].length; j++) {
+				const point = node.sections[i][j];
+				vertices.push(point.x, point.y, point.z);
+				subIndexList.push(currentIdx);
+				currentIdx++;
+			}
+			indexList.push(subIndexList);
+		}
+
+		// Create faces between sections
+		if (node.childNode.length < 2) {
+			for (let segmentIndex = 0; segmentIndex < node.sections.length - 1; segmentIndex++) {
+				const currentSection = indexList[segmentIndex];
+				const nextSection = indexList[segmentIndex + 1];
+
+				for (let k = 0; k < currentSection.length; k++) {
+					const j = k;
+					const jp1 = (j + 1) % currentSection.length;
+					// First triangle (ensure proper order for outward-facing normals)
+					indices.push(currentSection[jp1],  nextSection[j], currentSection[j]);
+					// Second triangle (ensure proper order for outward-facing normals)
+					indices.push(	nextSection[jp1], nextSection[j], currentSection[jp1]);
+				}
+			}
+		} else {
+			for (let segmentIndex = 0; segmentIndex < node.sections.length - 2; segmentIndex++) {
+				const currentSection = indexList[segmentIndex];
+				const nextSection = indexList[segmentIndex + 1];
+
+				for (let k = 0; k < currentSection.length; k++) {
+					const j = k;
+					const jp1 = (j + 1) % currentSection.length;
+					// First triangle (ensure proper order for outward-facing normals)
+					indices.push(currentSection[jp1],  nextSection[j], currentSection[j]);
+					// Second triangle (ensure proper order for outward-facing normals)
+					indices.push(	nextSection[jp1], nextSection[j], currentSection[jp1]);
+				}
+			}
+			const lastSection = indexList[indexList.length - 2];
+			const firstChildNode = node.childNode[0];
+			const firstChildSection = [];
+
+			// Add first section vertices of the child
+			for (let j = 0; j < firstChildNode.sections[0].length; j++) {
+				const point = firstChildNode.sections[0][j];
+				vertices.push(point.x, point.y, point.z);
+				firstChildSection.push(currentIdx);
+				currentIdx++;
+			}
+
+			for (let k = 0; k < lastSection.length; k++) {
+				const j = k;
+				const jp1 = (j + 1) % lastSection.length;
+
+				// First triangle (ensure proper order for outward-facing normals)
+				indices.push(lastSection[jp1], firstChildSection[j], lastSection[j]);
+				// Second triangle (ensure proper order for outward-facing normals)
+				indices.push(firstChildSection[jp1], firstChildSection[j], lastSection[jp1]);
+			}
+		}
+
+		// Create branch geometry
+		const branchBuffer = new THREE.BufferGeometry();
+		branchBuffer.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+		branchBuffer.setIndex(indices);
+		branchBuffer.computeVertexNormals();
+		branchList.push(branchBuffer);
+
+		// Traverse child nodes
+		if (node.childNode && Array.isArray(node.childNode)) {
+			for (const childNode of node.childNode) {
+				this.drawBody2(childNode, branchList, appleGeometries, leavesGeometries);
+			}
+		}
+
+	},
+
 	drawTreeHermite: function (rootNode, scene, alpha, leavesCutoff = 0.1, leavesDensity = 10, applesProbability = 0.05, matrix = new THREE.Matrix4()) {
 
 		const branchList = [];
 		const appleGeometries = [];
 		const leavesGeometries = [];
+		console.log(rootNode)
 
 		// Draw tree body
 		this.drawBody(rootNode, scene, alpha, leavesCutoff, leavesDensity, applesProbability, branchList, appleGeometries, leavesGeometries);
@@ -328,15 +418,54 @@ TP3.Render = {
 		const appleMesh = new THREE.Mesh(combinedGeometry, new THREE.MeshPhongMaterial({ color: 0xFF0000 }));
 		scene.add(appleMesh);
 
-		return [branchMesh, leaveMesh, appleMesh];
+		//console.log(mergedBranches.attributes.position.array)
+		return [mergedBranches, mergedLeaves, combinedGeometry];
 	},
 
 	updateTreeHermite: function (trunkGeometryBuffer, leavesGeometryBuffer, applesGeometryBuffer, rootNode) {
-		//TODO
+		const branchList = [];
+		const appleGeometries = [];
+		const leavesGeometries = [];
+		const stack = [rootNode];
+
+		while (stack.length > 0) {
+			const currentNode = stack.pop();
+
+			// Validate and obtain the transformation matrix
+			if (!(currentNode.transformMatrix instanceof THREE.Matrix4)) {
+				//console.error("Invalid transformMatrix in currentNode:", currentNode);
+				continue;
+			}
+			const combinedMatrix = currentNode.transformMatrix.clone();
+
+			// Process points in sections
+			if (Array.isArray(currentNode.sections)) {
+				for (let k = 0; k < currentNode.sections.length; k++) {
+					for (let j = 0; j < currentNode.sections[k].length; j++) {
+						const point = currentNode.sections[k][j];
+						point.applyMatrix4(combinedMatrix);
+
+					}
+				}
+			} else {
+				console.log("Invalid sections format in currentNode:", currentNode);
+			}
+
+			stack.push(...currentNode.childNode);
+
+		}
+
+		this.drawBody2(rootNode, branchList, appleGeometries, leavesGeometries);
+
+		// Merge and update geometries
+		const mergedBranches = THREE.BufferGeometryUtils.mergeBufferGeometries(branchList);
+		const mergedPositions = mergedBranches.attributes.position.array;
+		for (let i = 0; i < mergedPositions.length; i++) trunkGeometryBuffer[i] = mergedPositions[i];
+
 	},
 
+
 	drawTreeSkeleton: function (rootNode, scene, color = 0xffffff, matrix = new THREE.Matrix4()) {
-		console.log(rootNode)
 
 		let child = 0;
 		var stack = [];
@@ -422,7 +551,6 @@ TP3.Render = {
 
 		var stack = [];
 		stack.push(rootNode);
-		console.log(rootNode)
 		var points = [];
 		var pointsS = [];
 		var pointsT = [];

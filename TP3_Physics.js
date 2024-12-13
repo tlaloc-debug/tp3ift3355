@@ -95,8 +95,11 @@ TP3.Physics = {
 
 				node.childNode[i].p0 = node.p1;
 				childDir.applyMatrix4(combinedMatrix); // Rotation normale
-				
+
+				// save transmormation matrix
+				node.transformMatrix = combinedMatrix;
 				node.childNode[i].p1 = node.p1.clone().addScaledVector(childDir, childLength);
+
 			}
 		}
 	
