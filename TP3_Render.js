@@ -374,8 +374,7 @@ TP3.Render = {
 
 			// Vérifie si la matrice de transformation est valide.
 			if (!(currentNode.transformMatrix instanceof THREE.Matrix4)) {
-				//console.error("Invalid transformMatrix in currentNode:", currentNode);
-				continue;
+				currentNode.transformMatrix = new THREE.Matrix4();
 			}
 			const combinedMatrix = currentNode.transformMatrix.clone();
 
