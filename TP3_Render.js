@@ -198,6 +198,13 @@ TP3.Render = {
 					indices.push(	nextSection[jp1], nextSection[j], currentSection[jp1]);
 				}
 			}
+			if (node.childNode.length === 0) {
+				const lastSection = indexList[indexList.length - 1];
+				// Create triangles to close the section using the first vertex as a base
+				for (let i = 1; i < lastSection.length - 1; i++) {
+					indices.push(lastSection[0], lastSection[i], lastSection[i + 1]);
+				}
+			}
 
 		} else {
 			for (let segmentIndex = 0; segmentIndex < node.sections.length - 2; segmentIndex++) {
