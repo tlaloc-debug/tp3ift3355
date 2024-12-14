@@ -1,37 +1,39 @@
 TP3.Render = {
 	drawTreeRough: function (rootNode, scene, alpha, radialDivisions = 8, leavesCutoff = 0.1, leavesDensity = 10, applesProbability = 0.05, matrix = new THREE.Matrix4()) {
 		//TODO
-		// Material for branches
+
+		// Matériel pour les branches
 		var branchMaterial = new THREE.MeshLambertMaterial({ color: 0x8B5A2B });
-		// Material for leaves
+		// Matériel pour les feuilles
 		var leafMaterial = new THREE.MeshPhongMaterial({ color: 0x3A5F0B, side: THREE.DoubleSide });
-		// Material for apples
+		// Matériel pour les pommes
 		var appleMaterial = new THREE.MeshPhongMaterial({ color: 0xFF0000 });
 
-		// Recursive function to traverse the tree and draw branches
+		// Fonction récursive qui permet de parcourir l'arbre et de dessiner ses branches, feuilles et pommes.
 		function traverseTree(rootNode) {
 			if (rootNode.childNode.length > 0) {
 				for (var i = 0; i < rootNode.childNode.length; i++) {
 					var child = rootNode.childNode[i];
 
-					// Add branches
+					// Ajouter une branche.
 					TP3.Render.addBranch(rootNode, child, scene, branchMaterial, radialDivisions);
 
-					// Add leaves
+					// Si le rayon de départ de la branche est inférieur au seuil, ajoute des feuilles.
 					if (rootNode.a0 < alpha * leavesCutoff) {
 						for (var j = 0; j < leavesDensity; j++) {
 							TP3.Render.addLeaves(rootNode, child, scene, alpha, leavesCutoff, leafMaterial);
 						}
 
-						// Add Apples
-						if (Math.random() < applesProbability) TP3.Render.addPomme(rootNode, scene, alpha, appleMaterial);
+						// Ajoute des pommes de manière probabiliste.
+						if (Math.random() < applesProbability) 
+							TP3.Render.addPomme(rootNode, scene, alpha, appleMaterial);
 					}
 
-					// Recursively draw branches for the child
 					traverseTree(child);
 				}
+
 			} else {
-				// No children (terminal rootNode), create a fake child at p1 to point the branch correctly
+				// Si le nœud n'a pas d'enfant, crée un faux enfant pour dessiner correctement une branche terminale.
 				var fakeChild = {
 					p0: rootNode.p1,
 					p1: new THREE.Vector3(rootNode.p1.x, rootNode.p1.y + alpha, rootNode.p1.z),
@@ -39,10 +41,9 @@ TP3.Render = {
 					a1: rootNode.a1,
 					childNode: []
 				};
-
-				// Process the branch for the terminal rootNode (using the fake child)
 				TP3.Render.addBranch(rootNode, fakeChild, scene, branchMaterial, radialDivisions);
 
+				// Ajoute des feuilles à la branche terminale.
 				for (var l = 0; l < leavesDensity; l++) {
 					TP3.Render.addLeaves(rootNode, fakeChild, scene, alpha, leavesCutoff, leafMaterial);
 				}
@@ -50,57 +51,58 @@ TP3.Render = {
 
 		}
 
-		// Start the recursive traversal from the root rootNode
 		traverseTree(rootNode);
 	},
 
-	// Function to add the branch body
+
+	// Fonction auxiliaire qui crée une branche (cylindre) et l'ajoute à la scène.
 	addBranch: function(rootNode, child, scene, branchMaterial, radialDivisions) {
-		// Calculate the direction and length of the branch
+		// Calcule le vecteur directionnel de la branche entre le nœud parent et son enfant.
 		var direction = new THREE.Vector3().subVectors(child.p0, rootNode.p0);
+		// Calcule la longueur de la branche entre p0 et p1 du nœud parent.
 		var length = new THREE.Vector3().subVectors(rootNode.p1, rootNode.p0).length();
 
-		// Create cylinder geometry for the branch (from a0 to a1 radius)
+		// Créer une géométrie cylindrique, selon un rayon initial (a0) et final (a1), ainsi que sa longueur.
 		var branchGeometry = new THREE.CylinderBufferGeometry(rootNode.a1, rootNode.a0, length, radialDivisions);
-		// Shift the geometry so its base is at (0, 0, 0) instead of being centered
+		// Translate la géométrie pour que sa base soit positionnée à l'origine (0, 0, 0).
 		branchGeometry.translate(0, length / 2, 0);
 
 		var branchMesh = new THREE.Mesh(branchGeometry, branchMaterial);
+		// Positionne la branche au point de départ du nœud parent.
 		branchMesh.position.copy(rootNode.p0);
 
-		// Make the Y-axis point towards the next branch (child rootNode)
+		// Calculer l'axe de rotation et l'angle pour aligner la branche avec la direction souhaitée.
 		var up = new THREE.Vector3(0, 1, 0);
 		var axis = new THREE.Vector3().crossVectors(up, direction).normalize();
 		var angle = up.angleTo(direction);
 		branchMesh.rotateOnAxis(axis, angle);
 
-		// Add the branch to the scene
 		scene.add(branchMesh);
 	},
 
-	// Function to add leaves to a branch
-	addLeaves: function(rootNode, child, scene, alpha, leavesCutoff, leafMaterial) {
 
+	// Fonction auxiliaire qui crée une feuille (géométrie plane) et l'ajoute à la scène.
+	addLeaves: function(rootNode, child, scene, alpha, leavesCutoff, leafMaterial) {
 		var leafGeometry = new THREE.PlaneGeometry(alpha, alpha);
 		var leafMesh = new THREE.Mesh(leafGeometry, leafMaterial);
 
-		// Random position along the branch (between p0 and p1)
+		// Détermine un point aléatoire le long de la branche entre rootNode.p0 et child.p0.
 		var t = Math.random();
 		var randomPoint = new THREE.Vector3().lerpVectors(rootNode.p0, child.p0, t);
 
-		// Random displacement within a radius of alpha/2
+		// Ajoute un décalage aléatoire autour de ce point pour positionner la feuille de manière naturelle.
 		var offset = new THREE.Vector3(
 			(Math.random() - 0.5) * alpha,
 			(Math.random() - 0.5) * alpha,
 			(Math.random() - 0.5) * alpha
 		);
-		offset.clampLength(0, alpha / 2); // Ensure that the displacement is within the radius
+		offset.clampLength(0, alpha / 2); // Limite le décalage à un rayon de alpha/2
 
-		// Final position
+		// Applique le décalage au point aléatoire.
 		randomPoint.add(offset);
 		leafMesh.position.copy(randomPoint);
 
-		// Random rotation
+		// Applique une rotation aléatoire à la feuille pour une distribution naturelle.
 		leafMesh.rotation.set(
 			Math.random() * Math.PI,
 			Math.random() * Math.PI,
@@ -110,15 +112,16 @@ TP3.Render = {
 		scene.add(leafMesh);
 	},
 
-	// Function to add apples to a branch
-	addPomme: function(rootNode, scene, alpha, appleMaterial) {
 
+	// Fonction auxiliaire qui crée une pomme (cube) et l'ajoute à la scène.
+	addPomme: function(rootNode, scene, alpha, appleMaterial) {
 		var appleGeometry = new THREE.BoxGeometry(alpha, alpha, alpha);
 		var appleMesh = new THREE.Mesh(appleGeometry, appleMaterial);
 
+		// Positionne la pomme au point de départ de la branche (rootNode.p0).
 		appleMesh.position.copy(rootNode.p0);
 
-		// Add a little variability in position so that the apple is not exactly in the center
+		// Ajoute un décalage aléatoire à la position pour une distribution naturelle.
 		appleMesh.position.x += (Math.random() - 0.5) * alpha;
 		appleMesh.position.y += (Math.random() - 0.5) * alpha;
 		appleMesh.position.z += (Math.random() - 0.5) * alpha;
@@ -127,147 +130,60 @@ TP3.Render = {
 
 	},
 
-	// Function to add leaves to a branch
-	addLeavesHermite: function(node, child, leavesGeometries, alpha) {
-		// Create a triangular geometry
-		const triangleGeometry = new THREE.BufferGeometry();
 
-		// Define the vertices for an equilateral triangle
-		const vertices = new Float32Array([
-			0, alpha / 2, 0,                      // Top vertex
-			-alpha / 2, -alpha / 2, 0,            // Left vertex
-			alpha / 2, -alpha / 2, 0              // Right vertex
-		]);
+	drawTreeHermite: function (rootNode, scene, alpha, leavesCutoff = 0.1, leavesDensity = 10, applesProbability = 0.05, matrix = new THREE.Matrix4()) {
+		const branchList = [];
+		const appleGeometries = [];
+		const leavesGeometries = [];
 
-		triangleGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-		triangleGeometry.computeVertexNormals();
+		// Dessine le corps de l'arbre et collecter les géométries des branches, feuilles et pommes.
+		this.drawBody(rootNode, scene, alpha, leavesCutoff, leavesDensity, applesProbability,
+			branchList, appleGeometries, leavesGeometries);
 
-		// Random position along the branch between p0 and p1
-		const t = Math.random();
-		const randomPoint = new THREE.Vector3().lerpVectors(node.p0, child.p0, t);
+		// Fusionne les géométries des branches, crée un maillage et ajoute le tout  à la scène.
+		const mergedBranches = THREE.BufferGeometryUtils.mergeBufferGeometries(branchList);
+		const branchMesh = new THREE.Mesh(mergedBranches, new THREE.MeshLambertMaterial({ color: 0x8B5A2B }))
+		scene.add(branchMesh);
 
-		// Random offset within a radius of alpha / 2
-		const offset = new THREE.Vector3(
-			(Math.random() - 0.5) * alpha,
-			(Math.random() - 0.5) * alpha,
-			(Math.random() - 0.5) * alpha
-		);
-		offset.clampLength(0, alpha / 2); // Ensure the offset is within the radius
+		// Fusionne les géométries des feuilles, crée un maillage et ajoute le tout  à la scène.
+		const mergedLeaves = THREE.BufferGeometryUtils.mergeBufferGeometries(leavesGeometries);
+		const leaveMesh = new THREE.Mesh(
+			mergedLeaves, new THREE.MeshLambertMaterial({ color: 0x3A5F0B, side: THREE.DoubleSide }))
+		scene.add(leaveMesh);
 
-		// Final position with the offset applied
-		randomPoint.add(offset);
+		// Fusionne les géométries des pommes, crée un maillage et ajoute le tout  à la scène.
+		const mergedPommes = THREE.BufferGeometryUtils.mergeBufferGeometries(appleGeometries);
+		const appleMesh = new THREE.Mesh(mergedPommes, new THREE.MeshPhongMaterial({ color: 0xFF0000 }));
+		scene.add(appleMesh);
 
-		let randomRotation = new THREE.Vector3(
-			Math.random() * Math.PI,
-			Math.random() * Math.PI,
-			Math.random() * Math.PI);
-
-		triangleGeometry.rotateX(randomRotation.x);
-		triangleGeometry.rotateY(randomRotation.y);
-		triangleGeometry.rotateZ(randomRotation.z);
-
-		// Apply the position
-		triangleGeometry.translate(randomPoint.x, randomPoint.y, randomPoint.z);
-		node.leaveCenters.push(new THREE.Vector3(randomPoint.x, randomPoint.y, randomPoint.z));
-		node.leaveRotations.push(randomRotation);
-
-		// Add the triangle to the list
-		leavesGeometries.push(triangleGeometry);
-		node.leaveList.push(triangleGeometry)
+		return [mergedBranches, mergedLeaves, mergedPommes];
 	},
 
-	// Function to add apples to a branch
-	addPommeHermite: function(node, appleGeometries, alpha) {
-		const sphereGeometry = new THREE.SphereBufferGeometry(alpha / 2, 16, 16);
 
-		// Position each sphere randomly
-		const positionX = node.p0.x + (Math.random() - 0.5) * alpha;
-		const positionY = node.p0.y +(Math.random() - 0.5) * alpha;
-		const positionZ = node.p0.z +(Math.random() - 0.5) * alpha;
-
-		// Move the sphere to the desired position
-		sphereGeometry.translate(positionX, positionY, positionZ);
-		node.pommeCenters.push(new THREE.Vector3(positionX, positionY, positionZ));
-
-		// Add sphere geometry to the list
-		appleGeometries.push(sphereGeometry);
-		node.pommeList.push(sphereGeometry);
-
-	},
-
-	updatePommeHermite: function(node, position, pomme, appleGeometries, alpha, matrix) {
-		const sphereGeometry = new THREE.SphereBufferGeometry(alpha / 2, 16, 16);
-
-		let center = new THREE.Vector3(position.x, position.y, position.z);
-		center.applyMatrix4(matrix);
-
-		// Move the sphere to the desired position
-		sphereGeometry.translate(center.x, center.y, center.z);
-
-		// Add sphere geometry to the list
-		appleGeometries.push(sphereGeometry);
-		//node.pommeList.push(sphereGeometry);
-		position.x = center.x;
-		position.y = center.y;
-		position.z = center.z;
-	},
-
-	// Function to add leaves to a branch
-	updateLeavesHermite: function(node, position, rotation, leave, leavesGeometries, alpha, matrix) {
-		// Create a triangular geometry
-		const triangleGeometry = new THREE.BufferGeometry();
-
-		// Define the vertices for an equilateral triangle
-		const vertices = new Float32Array([
-			0, alpha / 2, 0,                      // Top vertex
-			-alpha / 2, -alpha / 2, 0,            // Left vertex
-			alpha / 2, -alpha / 2, 0              // Right vertex
-		]);
-
-		triangleGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-		triangleGeometry.computeVertexNormals();
-
-		triangleGeometry.rotateX(rotation.x);
-		triangleGeometry.rotateY(rotation.y);
-		triangleGeometry.rotateZ(rotation.z);
-
-		let center = new THREE.Vector3(position.x, position.y, position.z);
-		center.applyMatrix4(matrix);
-
-		// Apply the position
-		triangleGeometry.translate(center.x, center.y, center.z);
-
-		// Add the triangle to the list
-		leavesGeometries.push(triangleGeometry);
-		position.x = center.x;
-		position.y = center.y;
-		position.z = center.z;
-	},
-
+	// Fonction auxiliaire génère le corp de l'arbre en utilisant des sections circulaires.
 	drawBody: function (node, scene, alpha, leavesCutoff, leavesDensity, applesProbability,
 						branchList=[], appleGeometries=[], leavesGeometries=[]) {
-
 		const indexList = [];
 		const vertices = [];
 		const indices = [];
 		let currentIdx = 0;
 		node.alpha = alpha;
 
-		// Process points for vertices and indices
+		// Parcourt les sections circulaires du nœud pour ajouter les sommets.
 		for (let i = 0; i < node.sections.length; i++) {
 			const subIndexList = [];
 
-			// Add vertices for all sections
+			// Ajoute les sommets de la section courante.
 			for (let j = 0; j < node.sections[i].length; j++) {
 				const point = node.sections[i][j];
-				vertices.push(point.x, point.y, point.z);
-				subIndexList.push(currentIdx);
+				vertices.push(point.x, point.y, point.z); // Coordonnées du sommet.
+				subIndexList.push(currentIdx); // Enregistre l'indice du sommet.
 				currentIdx++;
 			}
-			indexList.push(subIndexList);
+			indexList.push(subIndexList); // Ajoute la liste des indices de la section courante.
 		}
 
-		// Create faces between sections
+		// Crée les faces triangulaires entre les sections.
 		if (node.childNode.length < 2) {
 			for (let segmentIndex = 0; segmentIndex < node.sections.length - 1; segmentIndex++) {
 				const currentSection = indexList[segmentIndex];
@@ -276,12 +192,13 @@ TP3.Render = {
 				for (let k = 0; k < currentSection.length; k++) {
 					const j = k;
 					const jp1 = (j + 1) % currentSection.length;
-					// First triangle (ensure proper order for outward-facing normals)
+					// Premier triangle (assure l'ordre correct pour des normales orientées vers l'extérieur)
 					indices.push(currentSection[jp1],  nextSection[j], currentSection[j]);
-					// Second triangle (ensure proper order for outward-facing normals)
+					// Deuxieme triangle (assure l'ordre correct pour des normales orientées vers l'extérieur)
 					indices.push(	nextSection[jp1], nextSection[j], currentSection[jp1]);
 				}
 			}
+
 		} else {
 			for (let segmentIndex = 0; segmentIndex < node.sections.length - 2; segmentIndex++) {
 				const currentSection = indexList[segmentIndex];
@@ -290,17 +207,18 @@ TP3.Render = {
 				for (let k = 0; k < currentSection.length; k++) {
 					const j = k;
 					const jp1 = (j + 1) % currentSection.length;
-					// First triangle (ensure proper order for outward-facing normals)
+					// Premier triangle (assure l'ordre correct pour des normales orientées vers l'extérieur)
 					indices.push(currentSection[jp1],  nextSection[j], currentSection[j]);
-					// Second triangle (ensure proper order for outward-facing normals)
+					// Deuxieme triangle (assure l'ordre correct pour des normales orientées vers l'extérieur)
 					indices.push(	nextSection[jp1], nextSection[j], currentSection[jp1]);
 				}
 			}
+
 			const lastSection = indexList[indexList.length - 2];
 			const firstChildNode = node.childNode[0];
 			const firstChildSection = [];
 
-			// Add first section vertices of the child
+			// Ajoute les sommets de la première section de l'enfant.
 			for (let j = 0; j < firstChildNode.sections[0].length; j++) {
 				const point = firstChildNode.sections[0][j];
 				vertices.push(point.x, point.y, point.z);
@@ -308,18 +226,18 @@ TP3.Render = {
 				currentIdx++;
 			}
 
+			// Crée des triangles entre la dernière section du nœud et la première section de l'enfant.
 			for (let k = 0; k < lastSection.length; k++) {
 				const j = k;
 				const jp1 = (j + 1) % lastSection.length;
-
-				// First triangle (ensure proper order for outward-facing normals)
+				// Premier triangle (assure l'ordre correct pour des normales orientées vers l'extérieur)
 				indices.push(lastSection[jp1], firstChildSection[j], lastSection[j]);
-				// Second triangle (ensure proper order for outward-facing normals)
+				// Deuxieme triangle (assure l'ordre correct pour des normales orientées vers l'extérieur)
 				indices.push(firstChildSection[jp1], firstChildSection[j], lastSection[jp1]);
 			}
 		}
 
-		// Create branch geometry
+		// Crée une géométrie pour la branche à partir des sommets et des indices, et l'ajoute à la liste.
 		const branchBuffer = new THREE.BufferGeometry();
 		branchBuffer.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
 		branchBuffer.setIndex(indices);
@@ -330,18 +248,18 @@ TP3.Render = {
 			for (var i = 0; i < node.childNode.length; i++) {
 				var child = node.childNode[i];
 
-				// Add leaves
+				// Si le rayon de départ de la branche est inférieur au seuil, ajoute des feuilles.
 				if (node.a0 < alpha * leavesCutoff) {
 					for (var j = 0; j < leavesDensity; j++) {
 						TP3.Render.addLeavesHermite(node, child, leavesGeometries, alpha);
 					}
 
-					// Add Apples
+					// Ajoute des pommes de manière probabiliste.
 					if (Math.random() < applesProbability) this.addPommeHermite(node, appleGeometries, alpha);
 				}
 			}
 		} else {
-			// No children (terminal rootNode), create a fake child at p1 to point the branch correctly
+			// Si le nœud n'a pas d'enfant, crée un faux enfant pour dessiner correctement une branche terminale.
 			var fakeChild = {
 				p0: node.p1,
 				p1: new THREE.Vector3(node.p1.x, node.p1.y + alpha, node.p1.z),
@@ -350,43 +268,183 @@ TP3.Render = {
 				childNode: []
 			};
 
+			// Ajoute des feuilles à la branche terminale.
 			for (var l = 0; l < leavesDensity; l++) {
 				TP3.Render.addLeavesHermite(node, fakeChild, leavesGeometries, alpha);
 			}
 		}
 
-		// Traverse child nodes
+		// Appel récursif pour dessiner les branches des enfants.
 		if (node.childNode && Array.isArray(node.childNode)) {
 			for (const childNode of node.childNode) {
 				this.drawBody(childNode, scene, alpha, leavesCutoff, leavesDensity, applesProbability,
 					branchList, appleGeometries, leavesGeometries);
 			}
 		}
+	},
+
+
+	// Fonction auxiliaire qui crée une feuille (géométrie triangulaire), en utilisant une interpolation Hermite.
+	addLeavesHermite: function(node, child, leavesGeometries, alpha) {
+		const triangleGeometry = new THREE.BufferGeometry();
+
+		// Définit les sommets du triangle équilatéral.
+		const vertices = new Float32Array([
+			0, alpha / 2, 0,            	// Sommet supérieur
+			-alpha / 2, -alpha / 2, 0,      // Sommet inférieur gauche
+			alpha / 2, -alpha / 2, 0        // Sommet inférieur droit
+		]);
+
+		// Ajoute les sommets à la géométrie.
+		triangleGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+		triangleGeometry.computeVertexNormals();
+
+		// Détermine un point aléatoire le long de la branche entre rootNode.p0 et child.p0.
+		const t = Math.random(); // Paramètre d'interpolation aléatoire.
+		const randomPoint = new THREE.Vector3().lerpVectors(node.p0, child.p0, t);
+
+		// Ajoute un décalage aléatoire autour de ce point pour positionner la feuille de manière naturelle.
+		const offset = new THREE.Vector3(
+			(Math.random() - 0.5) * alpha,
+			(Math.random() - 0.5) * alpha,
+			(Math.random() - 0.5) * alpha
+		);
+		offset.clampLength(0, alpha / 2); // Limite le décalage à un rayon de alpha/2
+
+		// Applique le décalage au point aléatoire.
+		randomPoint.add(offset);
+
+		// Applique une rotation aléatoire à la feuille pour une distribution naturelle.
+		let randomRotation = new THREE.Vector3(
+			Math.random() * Math.PI,
+			Math.random() * Math.PI,
+			Math.random() * Math.PI);
+		triangleGeometry.rotateX(randomRotation.x);
+		triangleGeometry.rotateY(randomRotation.y);
+		triangleGeometry.rotateZ(randomRotation.z);
+
+		// Ajoute le centre et la rotation à la liste pour une éventuelle mise à jour future.
+		triangleGeometry.translate(randomPoint.x, randomPoint.y, randomPoint.z);
+		node.leaveCenters.push(new THREE.Vector3(randomPoint.x, randomPoint.y, randomPoint.z));
+		node.leaveRotations.push(randomRotation);
+
+		// Ajoute la géométrie de la feuille à la liste des feuilles.
+		leavesGeometries.push(triangleGeometry);
+		node.leaveList.push(triangleGeometry); // Enregistre également dans le nœud pour suivi.
+	},
+
+
+	// Fonction auxiliaire qui crée une pomme (sphère).
+	addPommeHermite: function(node, appleGeometries, alpha) {
+		const sphereGeometry = new THREE.SphereBufferGeometry(alpha / 2, 16, 16);
+
+		// Calcule une position aléatoire pour la pomme autour du point de départ de la branche (node.p0).
+		const positionX = node.p0.x + (Math.random() - 0.5) * alpha;
+		const positionY = node.p0.y +(Math.random() - 0.5) * alpha;
+		const positionZ = node.p0.z +(Math.random() - 0.5) * alpha;
+
+		// Applique la position calculée à la géométrie de la pomme.
+		sphereGeometry.translate(positionX, positionY, positionZ);
+
+		// Stocke la position de la pomme dans le nœud pour une éventuelle mise à jour future.
+		node.pommeCenters.push(new THREE.Vector3(positionX, positionY, positionZ));
+
+		// Ajoute la géométrie de la pomme à la liste globale des pommes.
+		appleGeometries.push(sphereGeometry);
+		node.pommeList.push(sphereGeometry); // Enregistre également dans le nœud pour suivi.
+	},
+
+
+	updateTreeHermite: function (trunkGeometryBuffer, leavesGeometryBuffer, applesGeometryBuffer, rootNode) {
+		const branchList = [];
+		const pommeVector = [];
+		const leaveVector = [];
+
+		const stack = [rootNode]; // Pile pour effectuer un parcours en profondeur de l'arbre.
+
+		while (stack.length > 0) {
+			const currentNode = stack.pop(); // Récupère le nœud courant.
+
+			// Vérifie si la matrice de transformation est valide.
+			if (!(currentNode.transformMatrix instanceof THREE.Matrix4)) {
+				//console.error("Invalid transformMatrix in currentNode:", currentNode);
+				continue;
+			}
+			const combinedMatrix = currentNode.transformMatrix.clone();
+
+			// Met à jour les positions des points dans les sections du nœud.
+			if (Array.isArray(currentNode.sections)) {
+				for (let k = 0; k < currentNode.sections.length; k++) {
+					for (let j = 0; j < currentNode.sections[k].length; j++) {
+						const point = currentNode.sections[k][j];
+						point.applyMatrix4(combinedMatrix);
+
+					}
+				}
+
+			} else {
+				console.log("Invalid sections format in currentNode:", currentNode);
+			}
+
+			// Met à jour les géométries des pommes du nœud.
+			for (let l = 0; l < currentNode.pommeList.length; l++) {
+				this.updatePommeHermite(currentNode, currentNode.pommeCenters[l], currentNode.pommeList[l],
+					pommeVector, currentNode.alpha, combinedMatrix);
+			}
+
+			// Met à jour les géométries des feuilles du nœud.
+			for (let l = 0; l < currentNode.leaveList.length; l++) {
+				this.updateLeavesHermite(currentNode, currentNode.leaveCenters[l], currentNode.leaveRotations[l],
+					currentNode.leaveList[l], leaveVector, currentNode.alpha, combinedMatrix);
+			}
+
+			// Ajoute les enfants du nœud à la pile pour un traitement ultérieur.
+			stack.push(...currentNode.childNode); 
+		}
+
+		// Génère les géométries des branches mises à jour.
+		this.drawBody2(rootNode, branchList);
+
+		// Fusionne et met à jour les branches.
+		const mergedBranches = THREE.BufferGeometryUtils.mergeBufferGeometries(branchList);
+		const mergedBranchesPos = mergedBranches.attributes.position.array;
+		for (let i = 0; i < mergedBranchesPos.length; i++) trunkGeometryBuffer[i] = mergedBranchesPos[i];
+
+		// Fusionne et met à jour lees pommes.
+		const mergedPommes = THREE.BufferGeometryUtils.mergeBufferGeometries(pommeVector);
+		const mergedPommesPos = mergedPommes.attributes.position.array;
+		for (let i = 0; i < mergedPommesPos.length; i++) applesGeometryBuffer[i] = mergedPommesPos[i];
+
+		// Fusionne et met à jour les feuilles.
+		const mergedLeaves = THREE.BufferGeometryUtils.mergeBufferGeometries(leaveVector);
+		const mergedLeavesPos = mergedLeaves.attributes.position.array;
+		for (let i = 0; i < mergedLeavesPos.length; i++) leavesGeometryBuffer[i] = mergedLeavesPos[i];
 
 	},
 
-	drawBody2: function (node, branchList = []) {
 
+	// Fonction auxiliaire génère le corp de l'arbre en utilisant des sections circulaires.
+	drawBody2: function (node, branchList = []) {
 		const indexList = [];
 		const vertices = [];
 		const indices = [];
 		let currentIdx = 0;
 
-		// Process points for vertices and indices
+		// Parcourt les sections circulaires du nœud pour ajouter les sommets.
 		for (let i = 0; i < node.sections.length; i++) {
 			const subIndexList = [];
 
-			// Add vertices for all sections
+			// Ajoute les sommets de la section courante.
 			for (let j = 0; j < node.sections[i].length; j++) {
 				const point = node.sections[i][j];
-				vertices.push(point.x, point.y, point.z);
-				subIndexList.push(currentIdx);
+				vertices.push(point.x, point.y, point.z); // Coordonnées du sommet.
+				subIndexList.push(currentIdx); // Enregistre l'indice du sommet.
 				currentIdx++;
 			}
-			indexList.push(subIndexList);
+			indexList.push(subIndexList); // Ajoute la liste des indices de la section courante.
 		}
 
-		// Create faces between sections
+		// Crée les faces triangulaires entre les sections.
 		if (node.childNode.length < 2) {
 			for (let segmentIndex = 0; segmentIndex < node.sections.length - 1; segmentIndex++) {
 				const currentSection = indexList[segmentIndex];
@@ -395,9 +453,9 @@ TP3.Render = {
 				for (let k = 0; k < currentSection.length; k++) {
 					const j = k;
 					const jp1 = (j + 1) % currentSection.length;
-					// First triangle (ensure proper order for outward-facing normals)
+					// Premier triangle (assure l'ordre correct pour des normales orientées vers l'extérieur)
 					indices.push(currentSection[jp1],  nextSection[j], currentSection[j]);
-					// Second triangle (ensure proper order for outward-facing normals)
+					// Deuxieme triangle (assure l'ordre correct pour des normales orientées vers l'extérieur)
 					indices.push(	nextSection[jp1], nextSection[j], currentSection[jp1]);
 				}
 			}
@@ -409,17 +467,18 @@ TP3.Render = {
 				for (let k = 0; k < currentSection.length; k++) {
 					const j = k;
 					const jp1 = (j + 1) % currentSection.length;
-					// First triangle (ensure proper order for outward-facing normals)
+					// Premier triangle (assure l'ordre correct pour des normales orientées vers l'extérieur)
 					indices.push(currentSection[jp1],  nextSection[j], currentSection[j]);
-					// Second triangle (ensure proper order for outward-facing normals)
+					// Deuxieme triangle (assure l'ordre correct pour des normales orientées vers l'extérieur)
 					indices.push(	nextSection[jp1], nextSection[j], currentSection[jp1]);
 				}
 			}
+
 			const lastSection = indexList[indexList.length - 2];
 			const firstChildNode = node.childNode[0];
 			const firstChildSection = [];
 
-			// Add first section vertices of the child
+			// Ajoute les sommets de la première section de l'enfant.
 			for (let j = 0; j < firstChildNode.sections[0].length; j++) {
 				const point = firstChildNode.sections[0][j];
 				vertices.push(point.x, point.y, point.z);
@@ -427,29 +486,25 @@ TP3.Render = {
 				currentIdx++;
 			}
 
+			// Crée des triangles entre la dernière section du nœud et la première section de l'enfant.
 			for (let k = 0; k < lastSection.length; k++) {
 				const j = k;
 				const jp1 = (j + 1) % lastSection.length;
-
-				// First triangle (ensure proper order for outward-facing normals)
+				// Premier triangle (assure l'ordre correct pour des normales orientées vers l'extérieur)
 				indices.push(lastSection[jp1], firstChildSection[j], lastSection[j]);
-				// Second triangle (ensure proper order for outward-facing normals)
+				// Deuxieme triangle (assure l'ordre correct pour des normales orientées vers l'extérieur)
 				indices.push(firstChildSection[jp1], firstChildSection[j], lastSection[jp1]);
 			}
 		}
 
-		// Create branch geometry
+		// Crée une géométrie pour la branche à partir des sommets et des indices, et l'ajoute à la liste.
 		const branchBuffer = new THREE.BufferGeometry();
 		branchBuffer.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
 		branchBuffer.setIndex(indices);
 		branchBuffer.computeVertexNormals();
 		branchList.push(branchBuffer);
 
-		// for (let l = 0; l < node.pommeList.length; l++) {
-		// 	pommeVector.push(node.pommeList[l].applyMatrix4(combinedMatrix));
-		// }
-
-		// Traverse child nodes
+		// Appel récursif pour dessiner les branches des enfants.
 		if (node.childNode && Array.isArray(node.childNode)) {
 			for (const childNode of node.childNode) {
 				this.drawBody2(childNode, branchList);
@@ -458,106 +513,64 @@ TP3.Render = {
 
 	},
 
-	drawTreeHermite: function (rootNode, scene, alpha, leavesCutoff = 0.1, leavesDensity = 10, applesProbability = 0.05, matrix = new THREE.Matrix4()) {
 
-		const branchList = [];
-		const appleGeometries = [];
-		const leavesGeometries = [];
+	// Fonction auxiliaire qui met à jour la position d'une pomme.
+	updatePommeHermite: function(node, position, pomme, appleGeometries, alpha, matrix) {
+		const sphereGeometry = new THREE.SphereBufferGeometry(alpha / 2, 16, 16);
+		let center = new THREE.Vector3(position.x, position.y, position.z);
 
-		console.log(rootNode)
+		// Applique la matrice de transformation à la position de la pomme.
+		center.applyMatrix4(matrix);
 
-		// Draw tree body
-		this.drawBody(rootNode, scene, alpha, leavesCutoff, leavesDensity, applesProbability,
-			branchList, appleGeometries, leavesGeometries);
+		// Met à jour la position de la géométrie sphérique pour refléter la transformation.
+		sphereGeometry.translate(center.x, center.y, center.z);
 
-		// Merge and add geometries
-		const mergedBranches = THREE.BufferGeometryUtils.mergeBufferGeometries(branchList);
-		const branchMesh = new THREE.Mesh(mergedBranches, new THREE.MeshLambertMaterial({ color: 0x8B5A2B }))
-		scene.add(branchMesh);
+		// Ajoute la nouvelle géométrie de la pomme à la liste des géométries mises à jour.
+		appleGeometries.push(sphereGeometry);
 
-		// Leave Mesh
-		//console.log(leavesGeometries)
-		const mergedLeaves = THREE.BufferGeometryUtils.mergeBufferGeometries(leavesGeometries);
-		const leaveMesh = new THREE.Mesh(mergedLeaves, new THREE.MeshLambertMaterial({ color: 0x3A5F0B, side: THREE.DoubleSide }))
-		scene.add(leaveMesh);
-
-		// Apple Mesh
-		const mergedPommes = THREE.BufferGeometryUtils.mergeBufferGeometries(appleGeometries);
-		const appleMesh = new THREE.Mesh(mergedPommes, new THREE.MeshPhongMaterial({ color: 0xFF0000 }));
-		scene.add(appleMesh);
-
-		//console.log(mergedBranches.attributes.position.array)
-		return [mergedBranches, mergedLeaves, mergedPommes];
+		// Met à jour la position initiale de la pomme dans le nœud avec la position transformée.
+		position.x = center.x;
+		position.y = center.y;
+		position.z = center.z;
 	},
 
-	updateTreeHermite: function (trunkGeometryBuffer, leavesGeometryBuffer, applesGeometryBuffer, rootNode) {
-		const branchList = [];
-		const pommeVector = [];
-		const leaveVector = [];
 
-		const stack = [rootNode];
+	// Fonction auxiliaire qui met à jour la position d'une feuille.
+	updateLeavesHermite: function(node, position, rotation, leave, leavesGeometries, alpha, matrix) {
+		// Create a triangular geometry
+		const triangleGeometry = new THREE.BufferGeometry();
 
-		while (stack.length > 0) {
-			const currentNode = stack.pop();
+		// Définit les sommets d'un triangle équilatéral basé sur la taille alpha.
+		const vertices = new Float32Array([
+			0, alpha / 2, 0,                      // Top vertex
+			-alpha / 2, -alpha / 2, 0,            // Left vertex
+			alpha / 2, -alpha / 2, 0              // Right vertex
+		]);
 
+		// Attribue les sommets à la géométrie de la feuille.
+		triangleGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+		triangleGeometry.computeVertexNormals();
 
-			// Validate and obtain the transformation matrix
-			if (!(currentNode.transformMatrix instanceof THREE.Matrix4)) {
-				//console.error("Invalid transformMatrix in currentNode:", currentNode);
-				continue;
-			}
-			const combinedMatrix = currentNode.transformMatrix.clone();
+		// Applique les rotations initiales à la géométrie de la feuille.
+		triangleGeometry.rotateX(rotation.x);
+		triangleGeometry.rotateY(rotation.y);
+		triangleGeometry.rotateZ(rotation.z);
 
-			// Process points in sections
-			if (Array.isArray(currentNode.sections)) {
-				for (let k = 0; k < currentNode.sections.length; k++) {
-					for (let j = 0; j < currentNode.sections[k].length; j++) {
-						const point = currentNode.sections[k][j];
-						point.applyMatrix4(combinedMatrix);
+		let center = new THREE.Vector3(position.x, position.y, position.z);
 
-					}
-				}
-			} else {
-				console.log("Invalid sections format in currentNode:", currentNode);
-			}
+		// Applique la matrice de transformation à la position de la feuille.
+		center.applyMatrix4(matrix);
 
+		// Met à jour la position de la géométrie triangulaire pour refléter la transformation.
+		triangleGeometry.translate(center.x, center.y, center.z);
 
-			for (let l = 0; l < currentNode.pommeList.length; l++) {
-				this.updatePommeHermite(currentNode, currentNode.pommeCenters[l], currentNode.pommeList[l],
-					pommeVector, currentNode.alpha, combinedMatrix);
-				//console.log(currentNode)
-			}
+		// Ajoute la nouvelle géométrie de la feuille à la liste des géométries mises à jour.
+		leavesGeometries.push(triangleGeometry);
 
-			for (let l = 0; l < currentNode.leaveList.length; l++) {
-				this.updateLeavesHermite(currentNode, currentNode.leaveCenters[l], currentNode.leaveRotations[l],
-					currentNode.leaveList[l], leaveVector, currentNode.alpha, combinedMatrix);
-				//console.log(currentNode)
-			}
-
-			stack.push(...currentNode.childNode);
-
-		}
-
-		this.drawBody2(rootNode, branchList);
-
-		// Merge and update geometries
-		const mergedBranches = THREE.BufferGeometryUtils.mergeBufferGeometries(branchList);
-		const mergedBranchesPos = mergedBranches.attributes.position.array;
-		for (let i = 0; i < mergedBranchesPos.length; i++) trunkGeometryBuffer[i] = mergedBranchesPos[i];
-
-		//console.log(pommeVector)
-		// Apple Mesh
-		const mergedPommes = THREE.BufferGeometryUtils.mergeBufferGeometries(pommeVector);
-		const mergedPommesPos = mergedPommes.attributes.position.array;
-		//console.log(mergedPommesPos)
-		for (let i = 0; i < mergedPommesPos.length; i++) applesGeometryBuffer[i] = mergedPommesPos[i];
-
-		// Leave Mesh
-		const mergedLeaves = THREE.BufferGeometryUtils.mergeBufferGeometries(leaveVector);
-		const mergedLeavesPos = mergedLeaves.attributes.position.array;
-		//console.log(mergedPommesPos)
-		for (let i = 0; i < mergedLeavesPos.length; i++) leavesGeometryBuffer[i] = mergedLeavesPos[i];
-
+		// Met à jour la position initiale de la feuille dans le nœud avec la position transformée.
+		position.x = center.x;
+		position.y = center.y;
+		position.z = center.z;
 	},
 
 
